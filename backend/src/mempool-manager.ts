@@ -11,14 +11,21 @@
  */
 
 import { moneroRPC, BlockHeader, PoolTransaction, MoneroInfo } from './monero-rpc';
+import fs from 'fs';
+import path from 'path';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 /** Monero's hard-coded max block weight is 2× the long-term median weight.
  *  In practice blocks are ~300 KB, we cap a "mempool block" at this size. */
-const MEMPOOL_BLOCK_WEIGHT_CAP = 300_000; // bytes — a safe default
-const POLL_INTERVAL_MS = 8_000;           // refresh every 8 s
-const INITIAL_BLOCKS_COUNT = 10;          // how many recent blocks to fetch on startup
+const MEMPOOL_BLOCK_WEIGHT_CAP = 300_000;
+const POLL_INTERVAL_MS        = 8_000;
+const INITIAL_BLOCKS_COUNT    = 10;
+const FEE_HISTORY_MAX_POINTS  = 10_800;          // ~24 h at 8 s/poll
+const FEE_HISTORY_FILE        = path.join(        // persisted next to the source
+  __dirname, '..', 'data', 'fee-history.jsonl'
+);
+const FEE_HISTORY_KEEP_MS     = 7 * 24 * 60 * 60 * 1000; // keep 1 week on disk
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +63,14 @@ export interface RecommendedFees {
   slowFee: number;     // piconero/byte — ~10+ minutes (deprioritised)
   normalFee: number;   // piconero/byte — next 1–2 blocks
   fastFee: number;     // piconero/byte — next block (high probability)
+}
+
+export interface FeeSnapshot {
+  ts: number;          // unix ms
+  slowFee: number;
+  normalFee: number;
+  fastFee: number;
+  txPoolSize: number;
 }
 
 export interface NetworkStats {
@@ -197,6 +212,71 @@ class MempoolManager {
   private callbacks: ChangeCallback[] = [];
   private timer: NodeJS.Timeout | null = null;
   private previousTxPoolSize = -1;
+  private feeHistory: FeeSnapshot[] = [];
+  private feeHistoryFileStream: fs.WriteStream | null = null;
+
+  /** Load persisted fee history from disk on startup. */
+  private loadFeeHistory() {
+    try {
+      const dir = path.dirname(FEE_HISTORY_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      if (!fs.existsSync(FEE_HISTORY_FILE)) return;
+
+      const cutoff = Date.now() - FEE_HISTORY_KEEP_MS;
+      const lines = fs.readFileSync(FEE_HISTORY_FILE, 'utf8').split('\n');
+      const loaded: FeeSnapshot[] = [];
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const snap = JSON.parse(line) as FeeSnapshot;
+          if (snap.ts >= cutoff) loaded.push(snap);
+        } catch {
+          // skip malformed lines
+        }
+      }
+
+      // If we pruned anything, rewrite the file without stale entries
+      if (loaded.length < lines.filter(l => l.trim()).length) {
+        fs.writeFileSync(FEE_HISTORY_FILE, loaded.map(s => JSON.stringify(s)).join('\n') + '\n', 'utf8');
+      }
+
+      this.feeHistory = loaded;
+      if (loaded.length > 0) {
+        console.log(`[mempool] loaded ${loaded.length} fee history points from disk`);
+      }
+    } catch (err) {
+      console.error('[mempool] failed to load fee history:', err);
+    }
+
+    // Open append stream for ongoing writes
+    try {
+      const dir = path.dirname(FEE_HISTORY_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      this.feeHistoryFileStream = fs.createWriteStream(FEE_HISTORY_FILE, { flags: 'a' });
+    } catch (err) {
+      console.error('[mempool] failed to open fee history file for writing:', err);
+    }
+  }
+
+  /** Append a single snapshot to the JSONL file. */
+  private persistSnapshot(snap: FeeSnapshot) {
+    if (!this.feeHistoryFileStream) return;
+    try {
+      this.feeHistoryFileStream.write(JSON.stringify(snap) + '\n');
+    } catch (err) {
+      console.error('[mempool] failed to write fee history snapshot:', err);
+    }
+  }
+
+  getFeeHistory(windowMs = 2 * 60 * 60 * 1000): FeeSnapshot[] {
+    const cutoff = Date.now() - windowMs;
+    return this.feeHistory.filter(s => s.ts >= cutoff);
+  }
+
+  getAllFeeHistory(): FeeSnapshot[] {
+    return this.feeHistory;
+  }
 
   onStateChange(cb: ChangeCallback) {
     this.callbacks.push(cb);
@@ -213,6 +293,7 @@ class MempoolManager {
   }
 
   async start() {
+    this.loadFeeHistory();
     await this.refresh();
     this.timer = setInterval(() => {
       this.refresh().catch((err) => console.error('[mempool] refresh error:', err));
@@ -221,6 +302,7 @@ class MempoolManager {
 
   stop() {
     if (this.timer) clearInterval(this.timer);
+    if (this.feeHistoryFileStream) this.feeHistoryFileStream.end();
   }
 
   private async refresh() {
@@ -336,6 +418,20 @@ class MempoolManager {
         networkStats,
         lastUpdated: Date.now(),
       };
+
+      // Record fee history snapshot every poll
+      const snap: FeeSnapshot = {
+        ts: Date.now(),
+        slowFee:   fees.slowFee,
+        normalFee: fees.normalFee,
+        fastFee:   fees.fastFee,
+        txPoolSize: info.tx_pool_size,
+      };
+      this.feeHistory.push(snap);
+      this.persistSnapshot(snap);
+      if (this.feeHistory.length > FEE_HISTORY_MAX_POINTS) {
+        this.feeHistory.shift();
+      }
 
       // Only notify subscribers if something meaningful changed
       const txPoolChanged = info.tx_pool_size !== this.previousTxPoolSize;

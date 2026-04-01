@@ -3,12 +3,16 @@ import StatsBar from './StatsBar';
 import MempoolBlocks from './MempoolBlocks';
 import FeesBox from './FeesBox';
 import BlocksList from './BlocksList';
+import FeeChart from './FeeChart';
 
 interface Props {
   state: AppState;
+  selectedCurrency?: string;
+  xmrPrice?: number;
+  priceChange24h?: number | null;
 }
 
-export default function Dashboard({ state }: Props) {
+export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChange24h }: Props) {
   const { mempoolBlocks, recentBlocks, mempoolInfo, fees, networkStats, loading } = state;
 
   if (loading) {
@@ -24,7 +28,13 @@ export default function Dashboard({ state }: Props) {
   return (
     <div className="dashboard">
       {/* Stats bar */}
-      <StatsBar mempoolInfo={mempoolInfo} networkStats={networkStats} />
+      <StatsBar 
+        mempoolInfo={mempoolInfo} 
+        networkStats={networkStats} 
+        xmrPrice={xmrPrice}
+        selectedCurrency={selectedCurrency}
+        priceChange24h={priceChange24h}
+      />
 
       {/* Main visualisation: mempool ←→ blockchain */}
       <section className="blockchain-section">
@@ -33,8 +43,13 @@ export default function Dashboard({ state }: Props) {
 
       {/* Bottom row: fee box + info */}
       <section className="bottom-row">
-        <FeesBox fees={fees} />
+        <FeesBox fees={fees} selectedCurrency={selectedCurrency} xmrPrice={xmrPrice} />
         <MempoolSummary mempoolInfo={mempoolInfo} networkStats={networkStats} />
+      </section>
+
+      {/* Fee rate chart */}
+      <section className="chart-section">
+        <FeeChart />
       </section>
 
       {/* Block table */}

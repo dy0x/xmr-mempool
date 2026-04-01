@@ -121,10 +121,18 @@ router.get('/block/:hashOrHeight', async (req: Request, res: Response) => {
     const hashOrHeight = String(req.params['hashOrHeight'] ?? '');
     const isHeight = /^\d+$/.test(hashOrHeight);
     let block;
-    if (isHeight) {
-      block = await moneroRPC.getBlock(parseInt(hashOrHeight, 10));
-    } else {
-      block = await moneroRPC.getBlock(undefined, hashOrHeight);
+    try {
+      block = isHeight
+        ? await moneroRPC.getBlock(parseInt(hashOrHeight, 10))
+        : await moneroRPC.getBlock(undefined, hashOrHeight);
+    } catch (rpcErr) {
+      // RPC code -5 = not found by hash/height — return 404 so the frontend
+      // can try it as a txid instead of showing a 500 error.
+      const msg = String(rpcErr);
+      if (msg.includes('"code":-5') || msg.includes('not found') || msg.includes("can't get block")) {
+        return notFound(res, `Block "${hashOrHeight}" not found`);
+      }
+      throw rpcErr;
     }
     const h = block.block_header;
     return ok(res, {
@@ -176,6 +184,33 @@ router.get('/tx/:txid', async (req: Request, res: Response) => {
   } catch (err) {
     return serverError(res, err);
   }
+});
+
+// ── Fee history (for chart) ───────────────────────────────────────────────────
+
+const WINDOW_MAP: Record<string, number> = {
+  '2h':  2  * 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+  '1w':  7  * 24 * 60 * 60 * 1000,
+};
+
+router.get('/statistics/fees', (req: Request, res: Response) => {
+  const windowKey = String((req.query as Record<string, string>)['window'] ?? '2h');
+  const windowMs  = WINDOW_MAP[windowKey] ?? WINDOW_MAP['2h'];
+  const history   = mempoolManager.getFeeHistory(windowMs);
+
+  // Down-sample to at most 300 points so the response stays small
+  const maxPoints = 300;
+  let samples = history;
+  if (history.length > maxPoints) {
+    const step = Math.ceil(history.length / maxPoints);
+    samples = history.filter((_, i) => i % step === 0);
+    // Always include the latest point
+    const last = history[history.length - 1];
+    if (samples[samples.length - 1] !== last) samples.push(last);
+  }
+
+  return ok(res, samples);
 });
 
 // ── Backend info ──────────────────────────────────────────────────────────────

@@ -1,69 +1,75 @@
 /**
- * MempoolBlocks — the signature mempool.space visualisation.
+ * MempoolBlocks — the signature visualisation.
  *
- * Layout:  [pending blocks ← faded] ──→──  [confirmed blocks → solid]
+ * Layout (horizontally scrollable, auto-centred on the arrow):
+ *   ← [older pending] … [pending 2] [pending 1] ──→── [latest] [older confirmed] … →
  *
- * Each block is a rectangle coloured by median fee rate with a fill
- * bar showing how full it is relative to the Monero block weight median.
+ * Each block shows a gradient fill (cheap=green at bottom → expensive=red at top)
+ * that rises to represent how full the block is. Flat design, no 3D clipping.
  */
 
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { MempoolBlock, RecentBlock } from '../types';
-import {
-  feeRateColor,
-  blockFillPercent,
-  formatBytes,
-  formatFeeRate,
-  piconeroToXMR,
-  timeAgo,
-} from '../types';
+import { feeRateColor, formatBytes, formatFeeRate, piconeroToXMR, timeAgo } from '../types';
 
 interface Props {
   mempoolBlocks: MempoolBlock[];
-  recentBlocks: RecentBlock[];
+  recentBlocks:  RecentBlock[];
 }
 
-const MAX_MEMPOOL_BLOCKS = 5;   // how many pending blocks to show
-const MAX_RECENT_BLOCKS  = 6;   // how many confirmed blocks to show
+const MAX_PENDING = 6;
+const MAX_RECENT  = 7;
+const BLOCK_CAP   = 300_000; // bytes — used for fill %
 
 export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
-  const pending  = mempoolBlocks.slice(0, MAX_MEMPOOL_BLOCKS);
-  const recent   = recentBlocks.slice(0, MAX_RECENT_BLOCKS);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const pending = mempoolBlocks.slice(0, MAX_PENDING);
+  const recent  = recentBlocks.slice(0, MAX_RECENT);
+
+  // Ensure upcoming (pending) blocks are in view on load.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollLeft = 0;
+    });
+  }, [recent[0]?.height]);
 
   return (
-    <div className="blockchain-view">
-      {/* Pending mempool blocks — faded, left side */}
-      <div className="pending-blocks">
-        {pending.length === 0 && (
-          <div className="empty-mempool">
-            <span>Mempool empty</span>
-            <span className="empty-sub">No pending transactions</span>
-          </div>
-        )}
-        {[...pending].reverse().map((block) => (
-          <PendingBlock key={block.index} block={block} />
-        ))}
-      </div>
+    <div className="blockchain-scroll-outer" ref={scrollRef}>
+      <div className="blockchain-scroll-inner">
 
-      {/* Arrow */}
-      <div className="blockchain-arrow">
-        <svg viewBox="0 0 60 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M0 15 H52 M40 3 L52 15 L40 27"
-            stroke="#ff6600"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <div className="arrow-label">Confirmed</div>
-      </div>
+        {/* Pending blocks — oldest left, newest right (closest to arrow) */}
+        <div className="block-row block-row-pending">
+          {pending.length === 0 && (
+            <div className="block-empty"><span>Mempool empty</span></div>
+          )}
+          {[...pending].reverse().map((b) => (
+            <PendingBlock key={b.index} block={b} />
+          ))}
+        </div>
 
-      {/* Recent confirmed blocks — solid, right side */}
-      <div className="recent-blocks">
-        {recent.map((block, i) => (
-          <ConfirmedBlock key={block.height} block={block} isLatest={i === 0} />
-        ))}
+        {/* Arrow */}
+        <div className="chain-arrow">
+          <svg viewBox="0 0 72 36" fill="none">
+            <line x1="0" y1="18" x2="62" y2="18"
+              stroke="#ff6600" strokeWidth="2.5" strokeLinecap="round"/>
+            <polyline points="50,6 64,18 50,30"
+              stroke="#ff6600" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
+          <span className="chain-arrow-label">confirmed</span>
+        </div>
+
+        {/* Confirmed blocks — newest left, older right */}
+        <div className="block-row block-row-confirmed">
+          {recent.map((b, i) => (
+            <ConfirmedBlock key={b.height} block={b} isLatest={i === 0} />
+          ))}
+        </div>
+
       </div>
     </div>
   );
@@ -72,93 +78,95 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
 // ── Pending block ─────────────────────────────────────────────────────────────
 
 function PendingBlock({ block }: { block: MempoolBlock }) {
-  const color   = feeRateColor(block.medianFee);
-  const fill    = blockFillPercent(block.blockSize);
-  const isEmpty = block.nTx === 0;
+  const fill  = Math.min(100, (block.blockSize / BLOCK_CAP) * 100);
+  const color = feeRateColor(block.medianFee);
+  const [r, g, b] = hexToRgb(color);
+  const gradient = `linear-gradient(to top, rgba(${r},${g},${b},0.82) 0%, rgba(${r},${g},${b},0.40) 100%)`;
 
   return (
-    <div className="block-card block-pending" title={pendingTooltip(block)}>
-      {/* Fill bar (inside the block) */}
-      <div className="block-fill-bg">
-        <div
-          className="block-fill-bar"
-          style={{ height: `${fill}%`, background: color + '55' }}
-        />
+    <div
+      className="xblock xblock-pending"
+      title={pendingTip(block)}
+    >
+      <div className="xblock-face">
+        <div className="xblock-fill" style={{ background: gradient, height: `${fill}%` }} />
+        <div className="xblock-content">
+          {block.nTx === 0
+            ? <span className="xblock-empty-label">Empty</span>
+            : <>
+                <div className="xblock-fee" style={{ color: feeRateColor(block.medianFee) }}>
+                  {formatFeeRate(block.medianFee)}
+                </div>
+                <div className="xblock-txcount">{block.nTx.toLocaleString()} txs</div>
+                <div className="xblock-size">{formatBytes(block.blockSize)}</div>
+              </>
+          }
+        </div>
+        <div className="xblock-label xblock-label-pending">
+          In {block.index + 1} block{block.index > 0 ? 's' : ''}
+        </div>
       </div>
-
-      {/* Content */}
-      <div className="block-content">
-        {isEmpty ? (
-          <span className="block-empty-label">Empty</span>
-        ) : (
-          <>
-            <div className="block-fee" style={{ color }}>
-              {formatFeeRate(block.medianFee)}
-            </div>
-            <div className="block-txcount">{block.nTx.toLocaleString()} txs</div>
-            <div className="block-size">{formatBytes(block.blockSize)}</div>
-          </>
-        )}
-      </div>
-
-      {/* Index label */}
-      <div className="block-index-label">In {block.index + 1} block{block.index > 0 ? 's' : ''}</div>
     </div>
   );
 }
 
-function pendingTooltip(block: MempoolBlock): string {
+function pendingTip(b: MempoolBlock) {
   return [
-    `Projected block #${block.index + 1}`,
-    `Transactions: ${block.nTx.toLocaleString()}`,
-    `Size: ${formatBytes(block.blockSize)}`,
-    `Median fee: ${formatFeeRate(block.medianFee)}`,
-    `Total fees: ${piconeroToXMR(block.totalFees)} XMR`,
+    `In ${b.index + 1} block${b.index > 0 ? 's' : ''}`,
+    `${b.nTx.toLocaleString()} transactions`,
+    `Size: ${formatBytes(b.blockSize)}`,
+    `Median fee: ${formatFeeRate(b.medianFee)}`,
+    `Total fees: ${piconeroToXMR(b.totalFees, 6)} XMR`,
   ].join('\n');
 }
 
 // ── Confirmed block ───────────────────────────────────────────────────────────
 
 function ConfirmedBlock({ block, isLatest }: { block: RecentBlock; isLatest: boolean }) {
-  // Colour confirmed blocks by size relative to median (~300 KB)
-  const fillColor = block.nTx > 0 ? '#ff6600' : '#555';
+  const fill = Math.min(100, (block.size / BLOCK_CAP) * 100);
+  const fillGrad = `linear-gradient(to top,
+    rgba(255,102,0,0.80) 0%,
+    rgba(255,102,0,0.35) 60%,
+    rgba(255,102,0,0.08) 100%)`;
 
   return (
     <Link
       to={`/block/${block.height}`}
-      className={`block-card block-confirmed ${isLatest ? 'block-latest' : ''}`}
-      title={confirmedTooltip(block)}
+      className={`xblock xblock-confirmed${isLatest ? ' xblock-latest' : ''}`}
+      title={confirmedTip(block)}
     >
-      {/* Fill bar */}
-      <div className="block-fill-bg">
-        <div
-          className="block-fill-bar"
-          style={{
-            height: `${Math.min(100, (block.size / 300_000) * 100)}%`,
-            background: fillColor + '44',
-          }}
-        />
-      </div>
-
-      <div className="block-content">
-        <div className="block-height" style={{ color: isLatest ? '#ff6600' : '#e4e4e4' }}>
-          {block.height.toLocaleString()}
+      <div className="xblock-face">
+        <div className="xblock-fill" style={{ background: fillGrad, height: `${fill}%` }} />
+        <div className="xblock-content">
+          <div className="xblock-height" style={{ color: isLatest ? '#ff6600' : '#e4e4e4' }}>
+            {block.height.toLocaleString()}
+          </div>
+          <div className="xblock-txcount">{block.nTx.toLocaleString()} txs</div>
+          <div className="xblock-size">{formatBytes(block.size)}</div>
+          <div className="xblock-time">{timeAgo(block.timestamp)}</div>
         </div>
-        <div className="block-txcount">{block.nTx.toLocaleString()} txs</div>
-        <div className="block-size">{formatBytes(block.size)}</div>
-        <div className="block-time">{timeAgo(block.timestamp)}</div>
+        <div className="xblock-label xblock-label-confirmed">
+          {piconeroToXMR(block.reward, 3)} XMR
+        </div>
       </div>
     </Link>
   );
 }
 
-function confirmedTooltip(block: RecentBlock): string {
+function confirmedTip(b: RecentBlock) {
   return [
-    `Block #${block.height.toLocaleString()}`,
-    `Hash: ${block.hash.slice(0, 16)}…`,
-    `Transactions: ${block.nTx.toLocaleString()}`,
-    `Size: ${formatBytes(block.size)}`,
-    `Reward: ${piconeroToXMR(block.reward, 6)} XMR`,
-    `${timeAgo(block.timestamp)}`,
+    `Block #${b.height.toLocaleString()}`,
+    `${b.nTx.toLocaleString()} transactions`,
+    `Size: ${formatBytes(b.size)}`,
+    `Reward: ${piconeroToXMR(b.reward, 4)} XMR`,
+    timeAgo(b.timestamp),
   ].join('\n');
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
 }

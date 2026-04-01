@@ -1,9 +1,11 @@
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import NavBar from './components/NavBar';
 import Dashboard from './components/Dashboard';
 import BlockDetail from './components/BlockDetail';
 import TxDetail from './components/TxDetail';
+import CurrencyBar, { usePriceData } from './components/CurrencyBar';
+import About from './components/About';
 import { wsService, WSMessage, InitPayload, StatsPayload } from './services/websocket';
 import type { AppState } from './types';
 import './index.css';
@@ -65,6 +67,21 @@ function reducer(state: AppState, action: Action): AppState {
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
+  // Currency selection (persisted to localStorage so it survives page refresh)
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(() => {
+    try { return localStorage.getItem('xmr-currency') ?? 'usd'; } catch { return 'usd'; }
+  });
+
+  const handleSelectCurrency = (code: string) => {
+    setSelectedCurrency(code);
+    try { localStorage.setItem('xmr-currency', code); } catch { /* ignore */ }
+  };
+
+  // Live XMR price data
+  const priceData = usePriceData();
+  const xmrPrice = priceData.prices[selectedCurrency] ?? undefined;
+  const priceChange24h = priceData.changes[selectedCurrency] ?? null;
+
   useEffect(() => {
     const unsubMsg = wsService.onMessage((msg: WSMessage) => {
       switch (msg.type) {
@@ -87,9 +104,6 @@ export default function App() {
 
     const unsubStatus = wsService.onStatus((connected: boolean) => {
       dispatch({ type: 'CONNECTED', payload: connected });
-      if (!connected) {
-        // Will reconnect automatically — keep existing data visible
-      }
     });
 
     wsService.connect();
@@ -107,11 +121,27 @@ export default function App() {
         <NavBar connected={state.connected} networkStats={state.networkStats} />
         <main className="main-content">
           <Routes>
-            <Route path="/" element={<Dashboard state={state} />} />
+            <Route
+              path="/"
+              element={
+                <Dashboard
+                  state={state}
+                  selectedCurrency={selectedCurrency}
+                  xmrPrice={xmrPrice}
+                  priceChange24h={priceChange24h}
+                />
+              }
+            />
             <Route path="/block/:hashOrHeight" element={<BlockDetail />} />
             <Route path="/tx/:txid" element={<TxDetail />} />
+            <Route path="/about" element={<About />} />
           </Routes>
         </main>
+
+        <CurrencyBar
+          selectedCurrency={selectedCurrency}
+          onSelectCurrency={handleSelectCurrency}
+        />
       </div>
     </BrowserRouter>
   );

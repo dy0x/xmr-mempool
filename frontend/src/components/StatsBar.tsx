@@ -1,14 +1,28 @@
 import type { MempoolInfo, NetworkStats } from '../types';
 import { formatBytes, formatHashrate, formatDifficulty } from '../types';
 
+import { CURRENCIES } from './CurrencyBar';
+
 interface Props {
   mempoolInfo: MempoolInfo | null;
   networkStats: NetworkStats | null;
+  xmrPrice?: number;
+  selectedCurrency?: string;
+  priceChange24h?: number | null;
 }
 
-export default function StatsBar({ mempoolInfo, networkStats }: Props) {
+export default function StatsBar({ mempoolInfo, networkStats, xmrPrice, selectedCurrency, priceChange24h }: Props) {
+  const cur = CURRENCIES.find(c => c.code === selectedCurrency) ?? CURRENCIES[0];
+  const isUp = (priceChange24h ?? 0) >= 0;
+  
   return (
     <div className="stats-bar">
+      <Stat
+        label="XMR Price"
+        value={xmrPrice != null ? `${cur.symbol}${xmrPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+        sub={priceChange24h != null ? `${isUp ? '▲' : '▼'} ${Math.abs(priceChange24h).toFixed(2)}%` : undefined}
+        subColor={priceChange24h != null ? (isUp ? '#3bd16f' : '#faad14') : undefined}
+      />
       <Stat
         label="Unconfirmed TXs"
         value={mempoolInfo ? mempoolInfo.count.toLocaleString() : '—'}
@@ -28,12 +42,6 @@ export default function StatsBar({ mempoolInfo, networkStats }: Props) {
         label="Hashrate"
         value={networkStats ? formatHashrate(networkStats.hashrate) : '—'}
         sub="estimated"
-      />
-      <Stat
-        label="Connections"
-        value={networkStats ? networkStats.connections.toLocaleString() : '—'}
-        sub={networkStats?.synchronized ? 'synced' : 'syncing…'}
-        subColor={networkStats?.synchronized ? '#3bd16f' : '#faad14'}
       />
       <Stat
         label="Version"

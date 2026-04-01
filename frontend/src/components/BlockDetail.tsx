@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { formatBytes, piconeroToXMR, timeAgo } from '../types';
 
 interface BlockData {
@@ -21,6 +21,7 @@ interface BlockData {
 
 export default function BlockDetail() {
   const { hashOrHeight } = useParams<{ hashOrHeight: string }>();
+  const navigate = useNavigate();
   const [block, setBlock] = useState<BlockData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,10 +31,18 @@ export default function BlockDetail() {
     setLoading(true);
     setError(null);
     fetch(`/api/v1/block/${hashOrHeight}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
-      .then((data: BlockData) => { setBlock(data); setLoading(false); })
+      .then((r) => {
+        if (r.status === 404) {
+          // Looks like a txid — redirect transparently
+          navigate(`/tx/${hashOrHeight}`, { replace: true });
+          return null;
+        }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<BlockData>;
+      })
+      .then((data) => { if (data) { setBlock(data); setLoading(false); } })
       .catch((err: unknown) => { setError(String(err)); setLoading(false); });
-  }, [hashOrHeight]);
+  }, [hashOrHeight, navigate]);
 
   if (loading) return <div className="detail-loading">Loading block…</div>;
   if (error) return <div className="detail-error">Error: {error}</div>;

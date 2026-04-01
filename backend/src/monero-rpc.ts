@@ -348,6 +348,7 @@ class MoneroRPC {
   async getHeight(): Promise<{ height: number; status: string }> {
     return this.rest<{ height: number; status: string }>('get_height', 'GET');
   }
+
 }
 
 // ── Singleton ─────────────────────────────────────────────────────────────────

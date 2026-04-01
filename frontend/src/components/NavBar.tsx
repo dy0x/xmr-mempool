@@ -1,4 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { NetworkStats } from '../types';
 import { formatHashrate } from '../types';
 
@@ -9,6 +10,44 @@ interface Props {
 
 export default function NavBar({ connected, networkStats }: Props) {
   const location = useLocation();
+  const navigate  = useNavigate();
+  const [query, setQuery]     = useState('');
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcut: "/" focuses search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+
+    // Route based on input:
+    // 64-char hex → txid or block hash
+    // All digits → block height
+    // Otherwise → try block hash first
+    if (/^\d+$/.test(q)) {
+      navigate(`/block/${q}`);
+    } else if (/^[0-9a-fA-F]{64}$/.test(q)) {
+      // Could be a block hash or txid — we try block first; if it 404s,
+      // BlockDetail will fall back to TxDetail gracefully.
+      navigate(`/block/${q}`);
+    } else {
+      navigate(`/tx/${q}`);
+    }
+    setQuery('');
+    inputRef.current?.blur();
+  };
 
   const isActive = (path: string) =>
     location.pathname === path ? 'nav-link active' : 'nav-link';
@@ -26,7 +65,36 @@ export default function NavBar({ connected, networkStats }: Props) {
           </span>
         </Link>
 
-        {/* Network indicator */}
+        {/* Nav links */}
+        <div className="nav-links">
+          <Link to="/" className={isActive('/')}>Dashboard</Link>
+          <Link to="/about" className={isActive('/about')}>About</Link>
+        </div>
+
+        {/* Search bar */}
+        <form className={`search-form ${focused ? 'search-focused' : ''}`} onSubmit={handleSearch}>
+          <span className="search-icon">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5"/>
+              <line x1="10.5" y1="10.5" x2="15" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </span>
+          <input
+            ref={inputRef}
+            className="search-input"
+            type="text"
+            placeholder="Block height, block hash, or txid…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <kbd className="search-kbd">/</kbd>
+        </form>
+
+        {/* Network pill */}
         {networkStats && (
           <div className="network-pill">
             <span className="network-dot" style={{ background: connected ? '#3bd16f' : '#e84142' }} />
@@ -36,25 +104,14 @@ export default function NavBar({ connected, networkStats }: Props) {
           </div>
         )}
 
-        {/* Nav links */}
-        <div className="nav-links">
-          <Link to="/" className={isActive('/')}>Dashboard</Link>
-          <a
-            href={`http://192.168.0.12:9976`}
-            target="_blank"
-            rel="noreferrer"
-            className="nav-link"
-          >
-            Monero Node ↗
-          </a>
-          {networkStats && (
-            <span className="nav-stat" title="Network hashrate">
-              ⛏ {formatHashrate(networkStats.hashrate)}
-            </span>
-          )}
-        </div>
+        {/* Hashrate */}
+        {networkStats && (
+          <span className="nav-stat" title="Network hashrate">
+            ⛏ {formatHashrate(networkStats.hashrate)}
+          </span>
+        )}
 
-        {/* Connection status dot */}
+        {/* Connection status */}
         <div className={`ws-status ${connected ? 'ws-connected' : 'ws-disconnected'}`}>
           <span className="ws-dot" />
           <span className="ws-label">{connected ? 'Live' : 'Reconnecting…'}</span>
@@ -68,7 +125,6 @@ function XmrLogo() {
   return (
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="14" cy="14" r="14" fill="#FF6600"/>
-      <path d="M14 6L6 20h16L14 6Z" fill="white" opacity="0.15"/>
       <path
         d="M6.5 20.5V11.5l7.5 7.5 7.5-7.5v9"
         stroke="white"
