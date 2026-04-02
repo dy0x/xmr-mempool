@@ -1747,12 +1747,19 @@ a:hover {
 
 .app-footer {
   text-align: center;
-  padding: 16px;
+  padding: 10px 24px;
   font-size: 11px;
   color: var(--text-dim);
   border-top: 1px solid var(--border);
   background: var(--bg-card-dark);
   margin-top: auto;
+}
+
+.footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
 }
 
 .app-footer .mono {

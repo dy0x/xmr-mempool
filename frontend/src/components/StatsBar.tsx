@@ -47,7 +47,7 @@ export default function StatsBar({ mempoolInfo, networkStats, xmrPrice, selected
       />
       <Stat
         label="Total Emission"
-        value={networkStats?.totalEmission ? `${Math.floor(networkStats.totalEmission / 1e12).toLocaleString()} XMR` : '—'}
+        value={networkStats?.totalEmission ? `${Math.floor(networkStats.totalEmission / 1e12).toLocaleString()}` : '—'}
         sub="circulating"
       />
     </div>

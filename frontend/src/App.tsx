@@ -119,7 +119,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="app">
-        <NavBar connected={state.connected} networkStats={state.networkStats} />
+        <NavBar />
         <main className="main-content">
           <Routes>
             <Route
@@ -141,7 +141,13 @@ export default function App() {
         </main>
 
         <footer className="app-footer">
-          Node Version: <span className="mono">{state.networkStats?.version ?? 'Unknown'}</span>
+          <div className="footer-content">
+            <div className={`ws-status ${state.connected ? 'ws-connected' : 'ws-disconnected'}`}>
+              <span className="ws-dot" />
+              <span className="ws-label">Mainnet</span>
+            </div>
+            <span>Node Version: <span className="mono">{state.networkStats?.version ?? 'Unknown'}</span></span>
+          </div>
         </footer>
 
         <CurrencyBar

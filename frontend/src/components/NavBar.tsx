@@ -1,14 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import type { NetworkStats } from '../types';
-import { formatHashrate } from '../types';
 
-interface Props {
-  connected: boolean;
-  networkStats: NetworkStats | null;
-}
 
-export default function NavBar({ connected, networkStats }: Props) {
+export default function NavBar() {
   const location = useLocation();
   const navigate  = useNavigate();
   const [query, setQuery]     = useState('');
@@ -94,28 +88,6 @@ export default function NavBar({ connected, networkStats }: Props) {
           <kbd className="search-kbd">/</kbd>
         </form>
 
-        {/* Network pill */}
-        {networkStats && (
-          <div className="network-pill">
-            <span className="network-dot" style={{ background: connected ? '#3bd16f' : '#e84142' }} />
-            <span className="network-label">Mainnet</span>
-            <span className="network-sep">·</span>
-            <span className="network-stat">{networkStats.height.toLocaleString()}</span>
-          </div>
-        )}
-
-        {/* Hashrate */}
-        {networkStats && (
-          <span className="nav-stat" title="Network hashrate">
-            ⛏ {formatHashrate(networkStats.hashrate)}
-          </span>
-        )}
-
-        {/* Connection status */}
-        <div className={`ws-status ${connected ? 'ws-connected' : 'ws-disconnected'}`}>
-          <span className="ws-dot" />
-          <span className="ws-label">{connected ? 'Live' : 'Reconnecting…'}</span>
-        </div>
       </div>
     </nav>
   );

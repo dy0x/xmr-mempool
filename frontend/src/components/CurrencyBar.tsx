@@ -2,7 +2,8 @@
  * CurrencyBar — sticky footer showing live XMR price + currency selector.
  * Similar to the bottom bar on mempool.space.
  *
- * Fetches price from CoinGecko public API every 60 s.
+ * CoinGecko free tier: 30 req/min. We fetch every 5 minutes (12 req/hr)
+ * which keeps us well under the limit even with multiple users.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -93,7 +94,7 @@ export function usePriceData() {
 
   useEffect(() => {
     fetchPrices();
-    const timer = setInterval(fetchPrices, 60_000);
+    const timer = setInterval(fetchPrices, 5 * 60_000); // every 5 min
     return () => clearInterval(timer);
   }, [fetchPrices]);
 
