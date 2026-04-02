@@ -74,7 +74,7 @@ export default function BlockDetail() {
         <DetailRow label="Miner TX" value={block.minerTxHash} mono link={`/tx/${block.minerTxHash}`} />
       </div>
 
-      {block.txHashes.length > 0 && (
+      {(block.txHashes?.length ?? 0) > 0 && (
         <div className="detail-txlist">
           <h2>Transactions ({block.txHashes.length})</h2>
           <div className="tx-hash-list">

@@ -118,7 +118,7 @@ router.get('/mempool-block/:index', async (req: Request, res: Response) => {
     });
 
     // Bucket into projected blocks
-    const blocks: typeof txs[][] = [[]];
+    const blocks: Array<typeof txs> = [[]];
     let currentSize = 0;
     for (const tx of sorted) {
       const txSize = tx.weight > 0 ? tx.weight : tx.blob_size;
@@ -202,7 +202,7 @@ router.get('/block/:hashOrHeight', async (req: Request, res: Response) => {
       nonce: h.nonce,
       majorVersion: h.major_version,
       minorVersion: h.minor_version,
-      txHashes: block.tx_hashes,
+      txHashes: block.tx_hashes || [],
       minerTxHash: block.miner_tx_hash,
     });
   } catch (err) {
