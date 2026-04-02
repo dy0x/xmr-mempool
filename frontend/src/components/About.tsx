@@ -48,7 +48,7 @@ export default function About() {
       <div className="about-card about-donate-card">
         <h2 className="about-section-title">☕ Support the project</h2>
         <p className="about-body">
-          If you find this useful, feel free to send a tip in XMR. Every piconero appreciated.
+          If you find this useful, feel free to send a tip in XMR.
         </p>
 
         <div className="about-donate-inner">

@@ -20,7 +20,7 @@ import path from 'path';
  *  In practice blocks are ~300 KB, we cap a "mempool block" at this size. */
 const MEMPOOL_BLOCK_WEIGHT_CAP = 300_000;
 const POLL_INTERVAL_MS        = 8_000;
-const INITIAL_BLOCKS_COUNT    = 10;
+const INITIAL_BLOCKS_COUNT    = 40;
 const FEE_HISTORY_MAX_POINTS  = 10_800;          // ~24 h at 8 s/poll
 const FEE_HISTORY_FILE        = path.join(        // persisted next to the source
   __dirname, '..', 'data', 'fee-history.jsonl'
@@ -86,6 +86,7 @@ export interface NetworkStats {
   synchronized: boolean;
   topBlockHash: string;
   blockTarget: number;   // seconds
+  totalEmission?: number; // atomic units (piconero)
 }
 
 export interface MempoolState {
@@ -184,9 +185,21 @@ function blockHeaderToRecentBlock(header: BlockHeader): RecentBlock {
   };
 }
 
-function infoToNetworkStats(info: MoneroInfo): NetworkStats {
+function infoToNetworkStats(info: MoneroInfo, lastHeader?: BlockHeader): NetworkStats {
   // Approximate hashrate: difficulty / target_seconds
   const hashrate = info.difficulty / (info.target || 120);
+  
+  // Calculate mathematically if the node omits already_generated_coins
+  let circulatingEmission = lastHeader?.already_generated_coins;
+  if (!circulatingEmission) {
+    const tailHeight = 2641623;
+    const tailSupply = 18132000; // XMR total supply at height 2641623
+    if (info.height > tailHeight) {
+      const blocksSinceTail = info.height - tailHeight;
+      circulatingEmission = (tailSupply + (blocksSinceTail * 0.6)) * 1e12; // back to piconeros
+    }
+  }
+
   return {
     height: info.height,
     difficulty: info.difficulty,
@@ -200,6 +213,7 @@ function infoToNetworkStats(info: MoneroInfo): NetworkStats {
     synchronized: info.synchronized,
     topBlockHash: info.top_block_hash,
     blockTarget: info.target,
+    totalEmission: circulatingEmission,
   };
 }
 
@@ -408,7 +422,7 @@ class MempoolManager {
       }
 
       // ── Assemble state ───────────────────────────────────────────────────
-      const networkStats = infoToNetworkStats(info);
+      const networkStats = infoToNetworkStats(info, newTip ?? undefined);
 
       this.state = {
         info: mempoolInfo,

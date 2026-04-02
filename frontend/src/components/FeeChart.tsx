@@ -18,20 +18,20 @@ interface FeeSnapshot {
 type Window = '2h' | '24h' | '1w';
 
 const WINDOW_LABELS: Record<Window, string> = {
-  '2h':  '2 hours',
+  '2h': '2 hours',
   '24h': '24 hours',
-  '1w':  '1 week',
+  '1w': '1 week',
 };
 
 const SERIES = [
-  { key: 'fastFee'   as const, label: 'Fast',   color: '#ff6600' },
-  { key: 'normalFee' as const, label: 'Normal',  color: '#faad14' },
-  { key: 'slowFee'   as const, label: 'Slow',    color: '#3bd16f' },
+  { key: 'fastFee' as const, label: 'Fast', color: '#ff6600' },
+  { key: 'normalFee' as const, label: 'Normal', color: '#faad14' },
+  { key: 'slowFee' as const, label: 'Slow', color: '#3bd16f' },
 ];
 
 export default function FeeChart() {
-  const [window, setWindow]   = useState<Window>('2h');
-  const [data, setData]       = useState<FeeSnapshot[]>([]);
+  const [window, setWindow] = useState<Window>('2h');
+  const [data, setData] = useState<FeeSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; snap: FeeSnapshot } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null) as React.RefObject<SVGSVGElement>;
@@ -110,22 +110,45 @@ interface ChartSVGProps {
 }
 
 function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
-  const W = 900, H = 160;
-  const PAD = { top: 10, right: 16, bottom: 28, left: 52 };
+  const [size, setSize] = useState({ width: 900, height: 160 });
+
+  useEffect(() => {
+    if (!svgRef.current || !svgRef.current.parentElement) return;
+    const parent = svgRef.current.parentElement;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+          setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+        }
+      }
+    });
+    observer.observe(parent);
+
+    // Set initial size
+    const rect = parent.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setSize({ width: rect.width, height: rect.height });
+    }
+
+    return () => observer.disconnect();
+  }, [svgRef]);
+
+  const W = size.width, H = size.height;
+  const PAD = { top: 10, right: 32, bottom: 28, left: 52 };
   const cW = W - PAD.left - PAD.right;
-  const cH = H - PAD.top  - PAD.bottom;
+  const cH = H - PAD.top - PAD.bottom;
 
   const allFees = data.flatMap(d => [d.slowFee, d.normalFee, d.fastFee]).filter(v => v > 0);
-  const maxFee  = (Math.max(...allFees) * 1.12) || 1;
+  const maxFee = (Math.max(...allFees) * 1.12) || 1;
   // Start Y axis 10% below the lowest fee so all lines stay comfortably visible
-  const minFee  = Math.max(0, Math.min(...allFees) * 0.88);
+  const minFee = Math.max(0, Math.min(...allFees) * 0.88);
 
   const t0 = data[0].ts;
   const t1 = data[data.length - 1].ts;
   const tRange = t1 - t0 || 1;
 
   const toX = (ts: number) => PAD.left + ((ts - t0) / tRange) * cW;
-  const toY = (v: number)  => PAD.top  + cH - ((v - minFee) / (maxFee - minFee)) * cH;
+  const toY = (v: number) => PAD.top + cH - ((v - minFee) / (maxFee - minFee)) * cH;
 
   const buildPath = (key: keyof FeeSnapshot) =>
     data.map((d, i) => {
@@ -179,11 +202,12 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
+        preserveAspectRatio="none"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => onTooltip(null)}
       >
@@ -209,9 +233,9 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
 
         {/* Axis line */}
         <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + cH}
-          stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
+          stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
         <line x1={PAD.left} y1={PAD.top + cH} x2={PAD.left + cW} y2={PAD.top + cH}
-          stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
+          stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
 
         {/* Lines only — no area fill */}
         {SERIES.map(s => (
@@ -254,7 +278,7 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
         <div
           className="chart-tooltip"
           style={{
-            left: Math.min(tooltip.x / 900 * 100, 75) + '%',
+            left: Math.min(tooltip.x / W * 100, 75) + '%',
             top: '8px',
           }}
         >
@@ -266,7 +290,7 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
               <span className="chart-tooltip-val">{formatFeeShort(tooltip.snap[s.key] as number)}</span>
             </div>
           ))}
-          <div className="chart-tooltip-pool">Pool: {tooltip.snap.txPoolSize.toLocaleString()} txs</div>
+          <div className="chart-tooltip-pool">Pool: {tooltip.snap.txPoolSize.toLocaleString()} transactions</div>
         </div>
       )}
     </div>

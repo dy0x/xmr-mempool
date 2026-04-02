@@ -81,6 +81,7 @@ export default function App() {
   const priceData = usePriceData();
   const xmrPrice = priceData.prices[selectedCurrency] ?? undefined;
   const priceChange24h = priceData.changes[selectedCurrency] ?? null;
+  const priceFetchedAt = priceData.fetchedAt;
 
   useEffect(() => {
     const unsubMsg = wsService.onMessage((msg: WSMessage) => {
@@ -129,6 +130,7 @@ export default function App() {
                   selectedCurrency={selectedCurrency}
                   xmrPrice={xmrPrice}
                   priceChange24h={priceChange24h}
+                  priceFetchedAt={priceFetchedAt}
                 />
               }
             />
@@ -137,6 +139,10 @@ export default function App() {
             <Route path="/about" element={<About />} />
           </Routes>
         </main>
+
+        <footer className="app-footer">
+          Node Version: <span className="mono">{state.networkStats?.version ?? 'Unknown'}</span>
+        </footer>
 
         <CurrencyBar
           selectedCurrency={selectedCurrency}

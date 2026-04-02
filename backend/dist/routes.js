@@ -5,8 +5,8 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const mempool_manager_js_1 = require("./mempool-manager.js");
-const monero_rpc_js_1 = require("./monero-rpc.js");
+const mempool_manager_1 = require("./mempool-manager");
+const monero_rpc_1 = require("./monero-rpc");
 const router = (0, express_1.Router)();
 // ── Helper ────────────────────────────────────────────────────────────────────
 function ok(res, data) {
@@ -22,7 +22,7 @@ function serverError(res, err) {
 // ── Network / Info ────────────────────────────────────────────────────────────
 /** Full initial payload — what the frontend requests on first load */
 router.get('/init-data', (_req, res) => {
-    const state = mempool_manager_js_1.mempoolManager.getState();
+    const state = mempool_manager_1.mempoolManager.getState();
     if (!state)
         return notFound(res, 'Node not yet synced');
     return ok(res, {
@@ -35,7 +35,7 @@ router.get('/init-data', (_req, res) => {
     });
 });
 router.get('/network-info', (_req, res) => {
-    const state = mempool_manager_js_1.mempoolManager.getState();
+    const state = mempool_manager_1.mempoolManager.getState();
     if (!state)
         return notFound(res, 'Node not yet synced');
     return ok(res, state.networkStats);
@@ -43,7 +43,7 @@ router.get('/network-info', (_req, res) => {
 // ── Mempool ───────────────────────────────────────────────────────────────────
 router.get('/mempool', async (_req, res) => {
     try {
-        const state = mempool_manager_js_1.mempoolManager.getState();
+        const state = mempool_manager_1.mempoolManager.getState();
         return ok(res, state?.info ?? { count: 0, vsize: 0, totalFee: 0, memPoolMinFee: 0 });
     }
     catch (err) {
@@ -52,7 +52,7 @@ router.get('/mempool', async (_req, res) => {
 });
 router.get('/mempool/txids', async (_req, res) => {
     try {
-        const pool = await monero_rpc_js_1.moneroRPC.getTransactionPool();
+        const pool = await monero_rpc_1.moneroRPC.getTransactionPool();
         const txids = (pool.transactions ?? []).map((tx) => tx.id_hash);
         return ok(res, txids);
     }
@@ -62,7 +62,7 @@ router.get('/mempool/txids', async (_req, res) => {
 });
 router.get('/mempool/recent', async (_req, res) => {
     try {
-        const pool = await monero_rpc_js_1.moneroRPC.getTransactionPool();
+        const pool = await monero_rpc_1.moneroRPC.getTransactionPool();
         const recent = (pool.transactions ?? [])
             .sort((a, b) => b.receive_time - a.receive_time)
             .slice(0, 10)
@@ -82,20 +82,20 @@ router.get('/mempool/recent', async (_req, res) => {
     }
 });
 router.get('/fees/recommended', (_req, res) => {
-    const state = mempool_manager_js_1.mempoolManager.getState();
+    const state = mempool_manager_1.mempoolManager.getState();
     if (!state)
         return notFound(res, 'Node not yet synced');
     return ok(res, state.fees);
 });
 router.get('/fees/mempool-blocks', (_req, res) => {
-    const state = mempool_manager_js_1.mempoolManager.getState();
+    const state = mempool_manager_1.mempoolManager.getState();
     if (!state)
         return notFound(res, 'Node not yet synced');
     return ok(res, state.mempoolBlocks);
 });
 // ── Blocks ───────────────────────────────────────────────────────────────────
 router.get('/blocks', (_req, res) => {
-    const state = mempool_manager_js_1.mempoolManager.getState();
+    const state = mempool_manager_1.mempoolManager.getState();
     if (!state)
         return notFound(res, 'Node not yet synced');
     const countParam = typeof _req.query['count'] === 'string' ? _req.query['count'] : '15';
@@ -103,7 +103,7 @@ router.get('/blocks', (_req, res) => {
     return ok(res, state.recentBlocks.slice(0, count));
 });
 router.get('/block/tip/height', (_req, res) => {
-    const state = mempool_manager_js_1.mempoolManager.getState();
+    const state = mempool_manager_1.mempoolManager.getState();
     if (!state)
         return notFound(res, 'Node not yet synced');
     return ok(res, state.networkStats.height);
@@ -113,11 +113,19 @@ router.get('/block/:hashOrHeight', async (req, res) => {
         const hashOrHeight = String(req.params['hashOrHeight'] ?? '');
         const isHeight = /^\d+$/.test(hashOrHeight);
         let block;
-        if (isHeight) {
-            block = await monero_rpc_js_1.moneroRPC.getBlock(parseInt(hashOrHeight, 10));
+        try {
+            block = isHeight
+                ? await monero_rpc_1.moneroRPC.getBlock(parseInt(hashOrHeight, 10))
+                : await monero_rpc_1.moneroRPC.getBlock(undefined, hashOrHeight);
         }
-        else {
-            block = await monero_rpc_js_1.moneroRPC.getBlock(undefined, hashOrHeight);
+        catch (rpcErr) {
+            // RPC code -5 = not found by hash/height — return 404 so the frontend
+            // can try it as a txid instead of showing a 500 error.
+            const msg = String(rpcErr);
+            if (msg.includes('"code":-5') || msg.includes('not found') || msg.includes("can't get block")) {
+                return notFound(res, `Block "${hashOrHeight}" not found`);
+            }
+            throw rpcErr;
         }
         const h = block.block_header;
         return ok(res, {
@@ -145,7 +153,7 @@ router.get('/block/:hashOrHeight', async (req, res) => {
 router.get('/tx/:txid', async (req, res) => {
     try {
         const txid = String(req.params['txid'] ?? '');
-        const result = await monero_rpc_js_1.moneroRPC.getTransactions([txid], true);
+        const result = await monero_rpc_1.moneroRPC.getTransactions([txid], true);
         if (!result.txs || result.txs.length === 0) {
             return notFound(res, `Transaction ${txid} not found`);
         }
@@ -170,6 +178,29 @@ router.get('/tx/:txid', async (req, res) => {
     catch (err) {
         return serverError(res, err);
     }
+});
+// ── Fee history (for chart) ───────────────────────────────────────────────────
+const WINDOW_MAP = {
+    '2h': 2 * 60 * 60 * 1000,
+    '24h': 24 * 60 * 60 * 1000,
+    '1w': 7 * 24 * 60 * 60 * 1000,
+};
+router.get('/statistics/fees', (req, res) => {
+    const windowKey = String(req.query['window'] ?? '2h');
+    const windowMs = WINDOW_MAP[windowKey] ?? WINDOW_MAP['2h'];
+    const history = mempool_manager_1.mempoolManager.getFeeHistory(windowMs);
+    // Down-sample to at most 300 points so the response stays small
+    const maxPoints = 300;
+    let samples = history;
+    if (history.length > maxPoints) {
+        const step = Math.ceil(history.length / maxPoints);
+        samples = history.filter((_, i) => i % step === 0);
+        // Always include the latest point
+        const last = history[history.length - 1];
+        if (samples[samples.length - 1] !== last)
+            samples.push(last);
+    }
+    return ok(res, samples);
 });
 // ── Backend info ──────────────────────────────────────────────────────────────
 router.get('/backend-info', (_req, res) => {

@@ -17,20 +17,20 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const http_1 = require("http");
 const ws_1 = require("ws");
-const routes_js_1 = __importDefault(require("./routes.js"));
-const mempool_manager_js_1 = require("./mempool-manager.js");
+const routes_1 = __importDefault(require("./routes"));
+const mempool_manager_1 = require("./mempool-manager");
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const app = (0, express_1.default)();
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 // ── REST API ──────────────────────────────────────────────────────────────────
-app.use('/api/v1', routes_js_1.default);
+app.use('/api/v1', routes_1.default);
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 const httpServer = (0, http_1.createServer)(app);
-const wss = new ws_1.WebSocketServer({ server: httpServer });
+const wss = new ws_1.WebSocketServer({ server: httpServer, path: '/api/ws' });
 const clients = new Map();
 function send(ws, type, payload) {
     if (ws.readyState === ws_1.WebSocket.OPEN) {
@@ -57,13 +57,13 @@ function broadcastStateUpdate(state) {
     }
 }
 // Subscribe to mempool updates
-mempool_manager_js_1.mempoolManager.onStateChange(broadcastStateUpdate);
+mempool_manager_1.mempoolManager.onStateChange(broadcastStateUpdate);
 wss.on('connection', (ws) => {
     const clientState = { subscriptions: new Set(), alive: true };
     clients.set(ws, clientState);
     console.log(`[ws] client connected (total: ${clients.size})`);
     // Send current state immediately
-    const state = mempool_manager_js_1.mempoolManager.getState();
+    const state = mempool_manager_1.mempoolManager.getState();
     if (state) {
         send(ws, 'init', {
             blocks: state.recentBlocks.slice(0, 8),
@@ -83,7 +83,7 @@ wss.on('connection', (ws) => {
                 for (const sub of msg.data)
                     clientState.subscriptions.add(sub);
                 // Immediately send current data for new subscriptions
-                const s = mempool_manager_js_1.mempoolManager.getState();
+                const s = mempool_manager_1.mempoolManager.getState();
                 if (s) {
                     if (clientState.subscriptions.has('mempool-blocks')) {
                         send(ws, 'mempool-blocks', s.mempoolBlocks);
@@ -134,7 +134,7 @@ httpServer.listen(PORT, async () => {
     console.log(`   WebSocket: ws://localhost:${PORT}`);
     console.log(`\n   Connecting to Monero node…`);
     try {
-        await mempool_manager_js_1.mempoolManager.start();
+        await mempool_manager_1.mempoolManager.start();
         console.log('   ✅ Monero node connected & polling started\n');
     }
     catch (err) {
@@ -143,7 +143,7 @@ httpServer.listen(PORT, async () => {
     }
 });
 process.on('SIGTERM', () => {
-    mempool_manager_js_1.mempoolManager.stop();
+    mempool_manager_1.mempoolManager.stop();
     httpServer.close();
 });
 //# sourceMappingURL=server.js.map

@@ -18,24 +18,29 @@ interface Props {
   recentBlocks:  RecentBlock[];
 }
 
-const MAX_PENDING = 6;
-const MAX_RECENT  = 7;
+const MAX_PENDING = 40;
+const MAX_RECENT  = 40;
 const BLOCK_CAP   = 300_000; // bytes — used for fill %
 
 export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const arrowRef = useRef<HTMLDivElement>(null);
 
   const pending = mempoolBlocks.slice(0, MAX_PENDING);
   const recent  = recentBlocks.slice(0, MAX_RECENT);
 
-  // Ensure upcoming (pending) blocks are in view on load.
+  // Ensure the chain defaults to being perfectly centered on the arrow
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    const scrollEl = scrollRef.current;
+    const arrowEl = arrowRef.current;
+    if (!scrollEl || !arrowEl) return;
+
     requestAnimationFrame(() => {
-      el.scrollLeft = 0;
+      const arrowCenter = arrowEl.offsetLeft + (arrowEl.offsetWidth / 2);
+      const viewportHalf = scrollEl.clientWidth / 2;
+      scrollEl.scrollLeft = arrowCenter - viewportHalf;
     });
-  }, [recent[0]?.height]);
+  }, [recent[0]?.height, mempoolBlocks.length]);
 
   return (
     <div className="blockchain-scroll-outer" ref={scrollRef}>
@@ -52,7 +57,7 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
         </div>
 
         {/* Arrow */}
-        <div className="chain-arrow">
+        <div className="chain-arrow" ref={arrowRef}>
           <svg viewBox="0 0 72 36" fill="none">
             <line x1="0" y1="18" x2="62" y2="18"
               stroke="#ff6600" strokeWidth="2.5" strokeLinecap="round"/>
@@ -97,13 +102,13 @@ function PendingBlock({ block }: { block: MempoolBlock }) {
                 <div className="xblock-fee" style={{ color: feeRateColor(block.medianFee) }}>
                   {formatFeeRate(block.medianFee)}
                 </div>
-                <div className="xblock-txcount">{block.nTx.toLocaleString()} txs</div>
+                <div className="xblock-txcount">{block.nTx.toLocaleString()} transactions</div>
                 <div className="xblock-size">{formatBytes(block.blockSize)}</div>
               </>
           }
         </div>
         <div className="xblock-label xblock-label-pending">
-          In {block.index + 1} block{block.index > 0 ? 's' : ''}
+          ~ {(block.index + 1) * 2} mins
         </div>
       </div>
     </div>
@@ -112,7 +117,7 @@ function PendingBlock({ block }: { block: MempoolBlock }) {
 
 function pendingTip(b: MempoolBlock) {
   return [
-    `In ${b.index + 1} block${b.index > 0 ? 's' : ''}`,
+    `~ ${(b.index + 1) * 2} mins`,
     `${b.nTx.toLocaleString()} transactions`,
     `Size: ${formatBytes(b.blockSize)}`,
     `Median fee: ${formatFeeRate(b.medianFee)}`,
@@ -141,7 +146,7 @@ function ConfirmedBlock({ block, isLatest }: { block: RecentBlock; isLatest: boo
           <div className="xblock-height" style={{ color: isLatest ? '#ff6600' : '#e4e4e4' }}>
             {block.height.toLocaleString()}
           </div>
-          <div className="xblock-txcount">{block.nTx.toLocaleString()} txs</div>
+          <div className="xblock-txcount">{block.nTx.toLocaleString()} transactions</div>
           <div className="xblock-size">{formatBytes(block.size)}</div>
           <div className="xblock-time">{timeAgo(block.timestamp)}</div>
         </div>

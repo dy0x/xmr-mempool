@@ -41,6 +41,13 @@ export interface RecommendedFees {
     normalFee: number;
     fastFee: number;
 }
+export interface FeeSnapshot {
+    ts: number;
+    slowFee: number;
+    normalFee: number;
+    fastFee: number;
+    txPoolSize: number;
+}
 export interface NetworkStats {
     height: number;
     difficulty: number;
@@ -54,6 +61,7 @@ export interface NetworkStats {
     synchronized: boolean;
     topBlockHash: string;
     blockTarget: number;
+    totalEmission?: number;
 }
 export interface MempoolState {
     info: MempoolInfo;
@@ -69,6 +77,14 @@ declare class MempoolManager {
     private callbacks;
     private timer;
     private previousTxPoolSize;
+    private feeHistory;
+    private feeHistoryFileStream;
+    /** Load persisted fee history from disk on startup. */
+    private loadFeeHistory;
+    /** Append a single snapshot to the JSONL file. */
+    private persistSnapshot;
+    getFeeHistory(windowMs?: number): FeeSnapshot[];
+    getAllFeeHistory(): FeeSnapshot[];
     onStateChange(cb: ChangeCallback): void;
     private notify;
     getState(): MempoolState | null;

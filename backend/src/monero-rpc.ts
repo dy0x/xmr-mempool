@@ -11,6 +11,8 @@
 
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 // ── Digest auth ───────────────────────────────────────────────────────────────
 
@@ -128,6 +130,7 @@ export interface BlockHeader {
   reward: number;
   timestamp: number;
   miner_tx_hash: string;
+  already_generated_coins?: number;
 }
 
 export interface Block {
@@ -180,26 +183,34 @@ export interface FeeEstimate {
 
 // ── RPC client ────────────────────────────────────────────────────────────────
 
+export interface MoneroNodeConfig {
+  host: string;
+  port: number;
+  user?: string;
+  pass?: string;
+}
+
 class MoneroRPC {
-  private client: AxiosInstance;
-  private baseUrl: string;
+  private clients: { client: AxiosInstance; baseUrl: string; config: MoneroNodeConfig }[] = [];
 
-  constructor(
-    host: string = '192.168.0.12',
-    port: number = 18081,
-    private readonly user?: string,
-    private readonly pass?: string,
-  ) {
-    this.baseUrl = `http://${host}:${port}`;
-    this.client = axios.create({
-      baseURL: this.baseUrl,
-      timeout: 10000,
-      headers: { 'Content-Type': 'application/json' },
-      // Do NOT set axios `auth` — that sends Basic; we handle Digest ourselves.
-    });
+  constructor(configs: MoneroNodeConfig[]) {
+    if (configs.length === 0) {
+      configs = [{ host: '127.0.0.1', port: 18081 }];
+    }
 
-    if (user && pass) {
-      this.installDigestInterceptor();
+    for (const conf of configs) {
+      const baseUrl = `http://${conf.host}:${conf.port}`;
+      const client = axios.create({
+        baseURL: baseUrl,
+        timeout: 5000,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (conf.user && conf.pass) {
+        this.installDigestInterceptor(client, conf.user, conf.pass);
+      }
+
+      this.clients.push({ client, baseUrl, config: conf });
     }
   }
 
@@ -209,8 +220,8 @@ class MoneroRPC {
    *   2. Server replies 401 + WWW-Authenticate: Digest …
    *   3. We compute the Digest response and retry once.
    */
-  private installDigestInterceptor() {
-    this.client.interceptors.response.use(
+  private installDigestInterceptor(client: AxiosInstance, user: string, pass: string) {
+    client.interceptors.response.use(
       (res) => res,
       async (error: unknown) => {
         // Only handle 401 Digest challenges, and only retry once.
@@ -244,34 +255,57 @@ class MoneroRPC {
 
         const challenge = parseDigestChallenge(wwwAuth);
         config.headers['Authorization'] = buildDigestAuth(
-          method, uri, this.user!, this.pass!, challenge
+          method, uri, user, pass, challenge
         );
 
-        return this.client.request(config);
+        return client.request(config);
       }
     );
   }
 
-  private async jsonRpc<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
-    const response = await this.client.post('/json_rpc', {
-      jsonrpc: '2.0',
-      id: '0',
-      method,
-      params,
-    });
-    if (response.data.error) {
-      throw new Error(`RPC error [${method}]: ${JSON.stringify(response.data.error)}`);
+  private async executeWithFailover<T>(operation: (client: AxiosInstance) => Promise<T>): Promise<T> {
+    let lastError: unknown;
+
+    for (let i = 0; i < this.clients.length; i++) {
+      const { client, baseUrl } = this.clients[i];
+      try {
+        const result = await operation(client);
+        return result;
+      } catch (err: any) {
+        lastError = err;
+        if (i < this.clients.length - 1) {
+          console.warn(`[monero-rpc] Request failed on ${baseUrl}, trying next node...`);
+        }
+      }
     }
-    return response.data.result as T;
+
+    throw lastError;
+  }
+
+  private async jsonRpc<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+    return this.executeWithFailover(async (client) => {
+      const response = await client.post('/json_rpc', {
+        jsonrpc: '2.0',
+        id: '0',
+        method,
+        params,
+      });
+      if (response.data.error) {
+        throw new Error(`RPC error [${method}]: ${JSON.stringify(response.data.error)}`);
+      }
+      return response.data.result as T;
+    });
   }
 
   private async rest<T>(endpoint: string, method: 'GET' | 'POST' = 'GET', body?: unknown): Promise<T> {
-    const response = await this.client.request({
-      url: `/${endpoint}`,
-      method,
-      data: body,
+    return this.executeWithFailover(async (client) => {
+      const response = await client.request({
+        url: `/${endpoint}`,
+        method,
+        data: body,
+      });
+      return response.data as T;
     });
-    return response.data as T;
   }
 
   async getInfo(): Promise<MoneroInfo> {
@@ -353,11 +387,29 @@ class MoneroRPC {
 
 // ── Singleton ─────────────────────────────────────────────────────────────────
 
-export const moneroRPC = new MoneroRPC(
-  process.env.MONERO_HOST     || '192.168.0.12',
-  parseInt(process.env.MONERO_RPC_PORT || '18081', 10),
-  process.env.MONERO_RPC_USER || 'monero',
-  process.env.MONERO_RPC_PASS || 'WsPs_7onqOlvSNlaHltNn7MkCNpVs7XIZKD8WKEgVp0=',
-);
+function loadConfigNodes(): MoneroNodeConfig[] {
+  try {
+    const configPath = path.join(__dirname, '..', 'config.json');
+    if (fs.existsSync(configPath)) {
+      const raw = fs.readFileSync(configPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+        return parsed.nodes;
+      }
+    }
+  } catch (err) {
+    console.error('[monero-rpc] Error reading config.json:', err);
+  }
+
+  // Fallback to env vars
+  return [{
+    host: process.env.MONERO_HOST     || '192.168.0.12',
+    port: parseInt(process.env.MONERO_RPC_PORT || '18081', 10),
+    user: process.env.MONERO_RPC_USER || 'monero',
+    pass: process.env.MONERO_RPC_PASS || 'WsPs_7onqOlvSNlaHltNn7MkCNpVs7XIZKD8WKEgVp0=',
+  }];
+}
+
+export const moneroRPC = new MoneroRPC(loadConfigNodes());
 
 export default MoneroRPC;

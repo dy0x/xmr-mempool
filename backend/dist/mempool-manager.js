@@ -10,15 +10,24 @@
  *   - Fee unit: piconero / byte (1 XMR = 1e12 piconero)
  *   - No fee bumping / RBF / CPFP
  */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.mempoolManager = void 0;
-const monero_rpc_js_1 = require("./monero-rpc.js");
+const monero_rpc_1 = require("./monero-rpc");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 // ── Constants ────────────────────────────────────────────────────────────────
 /** Monero's hard-coded max block weight is 2× the long-term median weight.
  *  In practice blocks are ~300 KB, we cap a "mempool block" at this size. */
-const MEMPOOL_BLOCK_WEIGHT_CAP = 300000; // bytes — a safe default
-const POLL_INTERVAL_MS = 8000; // refresh every 8 s
-const INITIAL_BLOCKS_COUNT = 10; // how many recent blocks to fetch on startup
+const MEMPOOL_BLOCK_WEIGHT_CAP = 300000;
+const POLL_INTERVAL_MS = 8000;
+const INITIAL_BLOCKS_COUNT = 40;
+const FEE_HISTORY_MAX_POINTS = 10800; // ~24 h at 8 s/poll
+const FEE_HISTORY_FILE = path_1.default.join(// persisted next to the source
+__dirname, '..', 'data', 'fee-history.jsonl');
+const FEE_HISTORY_KEEP_MS = 7 * 24 * 60 * 60 * 1000; // keep 1 week on disk
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function feePerByte(tx) {
     const size = tx.weight > 0 ? tx.weight : tx.blob_size;
@@ -96,9 +105,19 @@ function blockHeaderToRecentBlock(header) {
         minorVersion: header.minor_version,
     };
 }
-function infoToNetworkStats(info) {
+function infoToNetworkStats(info, lastHeader) {
     // Approximate hashrate: difficulty / target_seconds
     const hashrate = info.difficulty / (info.target || 120);
+    // Calculate mathematically if the node omits already_generated_coins
+    let circulatingEmission = lastHeader?.already_generated_coins;
+    if (!circulatingEmission) {
+        const tailHeight = 2641623;
+        const tailSupply = 18132000; // XMR total supply at height 2641623
+        if (info.height > tailHeight) {
+            const blocksSinceTail = info.height - tailHeight;
+            circulatingEmission = (tailSupply + (blocksSinceTail * 0.6)) * 1e12; // back to piconeros
+        }
+    }
     return {
         height: info.height,
         difficulty: info.difficulty,
@@ -112,6 +131,7 @@ function infoToNetworkStats(info) {
         synchronized: info.synchronized,
         topBlockHash: info.top_block_hash,
         blockTarget: info.target,
+        totalEmission: circulatingEmission,
     };
 }
 class MempoolManager {
@@ -120,6 +140,72 @@ class MempoolManager {
         this.callbacks = [];
         this.timer = null;
         this.previousTxPoolSize = -1;
+        this.feeHistory = [];
+        this.feeHistoryFileStream = null;
+    }
+    /** Load persisted fee history from disk on startup. */
+    loadFeeHistory() {
+        try {
+            const dir = path_1.default.dirname(FEE_HISTORY_FILE);
+            if (!fs_1.default.existsSync(dir))
+                fs_1.default.mkdirSync(dir, { recursive: true });
+            if (!fs_1.default.existsSync(FEE_HISTORY_FILE))
+                return;
+            const cutoff = Date.now() - FEE_HISTORY_KEEP_MS;
+            const lines = fs_1.default.readFileSync(FEE_HISTORY_FILE, 'utf8').split('\n');
+            const loaded = [];
+            for (const line of lines) {
+                if (!line.trim())
+                    continue;
+                try {
+                    const snap = JSON.parse(line);
+                    if (snap.ts >= cutoff)
+                        loaded.push(snap);
+                }
+                catch {
+                    // skip malformed lines
+                }
+            }
+            // If we pruned anything, rewrite the file without stale entries
+            if (loaded.length < lines.filter(l => l.trim()).length) {
+                fs_1.default.writeFileSync(FEE_HISTORY_FILE, loaded.map(s => JSON.stringify(s)).join('\n') + '\n', 'utf8');
+            }
+            this.feeHistory = loaded;
+            if (loaded.length > 0) {
+                console.log(`[mempool] loaded ${loaded.length} fee history points from disk`);
+            }
+        }
+        catch (err) {
+            console.error('[mempool] failed to load fee history:', err);
+        }
+        // Open append stream for ongoing writes
+        try {
+            const dir = path_1.default.dirname(FEE_HISTORY_FILE);
+            if (!fs_1.default.existsSync(dir))
+                fs_1.default.mkdirSync(dir, { recursive: true });
+            this.feeHistoryFileStream = fs_1.default.createWriteStream(FEE_HISTORY_FILE, { flags: 'a' });
+        }
+        catch (err) {
+            console.error('[mempool] failed to open fee history file for writing:', err);
+        }
+    }
+    /** Append a single snapshot to the JSONL file. */
+    persistSnapshot(snap) {
+        if (!this.feeHistoryFileStream)
+            return;
+        try {
+            this.feeHistoryFileStream.write(JSON.stringify(snap) + '\n');
+        }
+        catch (err) {
+            console.error('[mempool] failed to write fee history snapshot:', err);
+        }
+    }
+    getFeeHistory(windowMs = 2 * 60 * 60 * 1000) {
+        const cutoff = Date.now() - windowMs;
+        return this.feeHistory.filter(s => s.ts >= cutoff);
+    }
+    getAllFeeHistory() {
+        return this.feeHistory;
     }
     onStateChange(cb) {
         this.callbacks.push(cb);
@@ -134,6 +220,7 @@ class MempoolManager {
         return this.state;
     }
     async start() {
+        this.loadFeeHistory();
         await this.refresh();
         this.timer = setInterval(() => {
             this.refresh().catch((err) => console.error('[mempool] refresh error:', err));
@@ -142,15 +229,17 @@ class MempoolManager {
     stop() {
         if (this.timer)
             clearInterval(this.timer);
+        if (this.feeHistoryFileStream)
+            this.feeHistoryFileStream.end();
     }
     async refresh() {
         try {
             const [infoResult, poolResult, statsResult, feeResult, lastHeaderResult] = await Promise.allSettled([
-                monero_rpc_js_1.moneroRPC.getInfo(),
-                monero_rpc_js_1.moneroRPC.getTransactionPool(),
-                monero_rpc_js_1.moneroRPC.getTransactionPoolStats(),
-                monero_rpc_js_1.moneroRPC.getFeeEstimate(10),
-                monero_rpc_js_1.moneroRPC.getLastBlockHeader(),
+                monero_rpc_1.moneroRPC.getInfo(),
+                monero_rpc_1.moneroRPC.getTransactionPool(),
+                monero_rpc_1.moneroRPC.getTransactionPoolStats(),
+                monero_rpc_1.moneroRPC.getFeeEstimate(10),
+                monero_rpc_1.moneroRPC.getLastBlockHeader(),
             ]);
             // Bail out if info (the most critical call) failed
             if (infoResult.status === 'rejected') {
@@ -217,7 +306,7 @@ class MempoolManager {
                 const tipHeight = newTip ? newTip.height : info.height - 1;
                 const startHeight = Math.max(0, tipHeight - INITIAL_BLOCKS_COUNT + 1);
                 try {
-                    const rangeResult = await monero_rpc_js_1.moneroRPC.getBlockHeadersRange(startHeight, tipHeight);
+                    const rangeResult = await monero_rpc_1.moneroRPC.getBlockHeadersRange(startHeight, tipHeight);
                     recentBlocks = rangeResult.headers
                         .map(blockHeaderToRecentBlock)
                         .reverse(); // newest first
@@ -231,7 +320,7 @@ class MempoolManager {
                 }
             }
             // ── Assemble state ───────────────────────────────────────────────────
-            const networkStats = infoToNetworkStats(info);
+            const networkStats = infoToNetworkStats(info, newTip ?? undefined);
             this.state = {
                 info: mempoolInfo,
                 mempoolBlocks,
@@ -240,6 +329,19 @@ class MempoolManager {
                 networkStats,
                 lastUpdated: Date.now(),
             };
+            // Record fee history snapshot every poll
+            const snap = {
+                ts: Date.now(),
+                slowFee: fees.slowFee,
+                normalFee: fees.normalFee,
+                fastFee: fees.fastFee,
+                txPoolSize: info.tx_pool_size,
+            };
+            this.feeHistory.push(snap);
+            this.persistSnapshot(snap);
+            if (this.feeHistory.length > FEE_HISTORY_MAX_POINTS) {
+                this.feeHistory.shift();
+            }
             // Only notify subscribers if something meaningful changed
             const txPoolChanged = info.tx_pool_size !== this.previousTxPoolSize;
             const blockChanged = needsBlockRefresh;

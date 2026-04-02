@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {
+      "host": "192.168.0.12",
+      "port": 18081,
+      "user": "monero",
+      "pass": "WsPs_7onqOlvSNlaHltNn7MkCNpVs7XIZKD8WKEgVp0="
+    },
+    {
+      "host": "node.supportxmr.com",
+      "port": 18081
+    }
+  ]
+}

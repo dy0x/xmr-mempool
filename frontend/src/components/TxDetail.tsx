@@ -77,7 +77,7 @@ export default function TxDetail() {
           />
         )}
         {fee > 0 && (
-          <DetailRow label="Fee" value={`${piconeroToXMR(fee, 8)} XMR (${fee.toLocaleString()} piconero)`} />
+          <DetailRow label="Fee" value={`${piconeroToXMR(fee, 8)} XMR`} />
         )}
         <DetailRow label="Inputs" value={inputCount.toLocaleString()} />
         <DetailRow label="Outputs" value={outputCount.toLocaleString()} />

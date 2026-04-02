@@ -49,6 +49,7 @@ export interface NetworkStats {
   synchronized: boolean;
   topBlockHash: string;
   blockTarget: number;
+  totalEmission?: number;
 }
 
 export interface AppState {
@@ -119,7 +120,7 @@ export function feeRateColor(feeRate: number): string {
   const t = Math.min(1, Math.max(0, (feeRate - min) / (max - min)));
   // green → amber → orange → red
   if (t < 0.25) return '#3bd16f';
-  if (t < 0.5)  return '#faad14';
+  if (t < 0.5) return '#faad14';
   if (t < 0.75) return '#ff6600';
   return '#e84142';
 }

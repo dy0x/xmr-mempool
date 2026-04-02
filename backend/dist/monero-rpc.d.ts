@@ -3,6 +3,10 @@
  * Talks to monerod's JSON-RPC and REST endpoints.
  * JSON-RPC: POST http://host:port/json_rpc
  * REST:     GET/POST http://host:port/<endpoint>
+ *
+ * monerod uses HTTP Digest authentication (MD5/MD5-sess), NOT Basic auth.
+ * Axios only supports Basic auth natively, so we implement the Digest
+ * challenge-response handshake manually via a response interceptor.
  */
 export interface MoneroInfo {
     height: number;
@@ -51,6 +55,7 @@ export interface BlockHeader {
     reward: number;
     timestamp: number;
     miner_tx_hash: string;
+    already_generated_coins?: number;
 }
 export interface Block {
     blob: string;
@@ -96,10 +101,23 @@ export interface FeeEstimate {
     quantization_mask: number;
     status: string;
 }
+export interface MoneroNodeConfig {
+    host: string;
+    port: number;
+    user?: string;
+    pass?: string;
+}
 declare class MoneroRPC {
-    private client;
-    private baseUrl;
-    constructor(host?: string, port?: number, user?: string, pass?: string);
+    private clients;
+    constructor(configs: MoneroNodeConfig[]);
+    /**
+     * Axios response interceptor that implements the Digest auth handshake:
+     *   1. Request goes out with no auth header.
+     *   2. Server replies 401 + WWW-Authenticate: Digest …
+     *   3. We compute the Digest response and retry once.
+     */
+    private installDigestInterceptor;
+    private executeWithFailover;
     private jsonRpc;
     private rest;
     getInfo(): Promise<MoneroInfo>;

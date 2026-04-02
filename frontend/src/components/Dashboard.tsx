@@ -10,9 +10,10 @@ interface Props {
   selectedCurrency?: string;
   xmrPrice?: number;
   priceChange24h?: number | null;
+  priceFetchedAt?: number;
 }
 
-export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChange24h }: Props) {
+export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChange24h, priceFetchedAt }: Props) {
   const { mempoolBlocks, recentBlocks, mempoolInfo, fees, networkStats, loading } = state;
 
   if (loading) {
@@ -34,6 +35,7 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
         xmrPrice={xmrPrice}
         selectedCurrency={selectedCurrency}
         priceChange24h={priceChange24h}
+        priceFetchedAt={priceFetchedAt}
       />
 
       {/* Main visualisation: mempool ←→ blockchain */}
@@ -43,7 +45,7 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
 
       {/* Bottom row: fee box + info */}
       <section className="bottom-row">
-        <FeesBox fees={fees} selectedCurrency={selectedCurrency} xmrPrice={xmrPrice} />
+        <FeesBox fees={fees} selectedCurrency={selectedCurrency} xmrPrice={xmrPrice} mempoolBlocks={mempoolBlocks} />
         <MempoolSummary mempoolInfo={mempoolInfo} networkStats={networkStats} />
       </section>
 
