@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MempoolBlock, RecentBlock } from '../types';
 import { feeRateColor, formatBytes, formatFeeRate, piconeroToXMR, timeAgo } from '../types';
+import XMRAmount from './XMRAmount';
 
 interface Props {
   mempoolBlocks: MempoolBlock[];
@@ -94,7 +95,7 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
             <div className="block-empty"><span>Mempool empty</span></div>
           )}
           {[...pending].reverse().map((b) => (
-            <PendingBlock key={b.index} block={b} />
+            <PendingBlock key={b.index} block={b} onClick={handleBlockClick} />
           ))}
         </div>
 
@@ -129,16 +130,18 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
 
 // ── Pending block ─────────────────────────────────────────────────────────────
 
-function PendingBlock({ block }: { block: MempoolBlock }) {
+function PendingBlock({ block, onClick }: { block: MempoolBlock; onClick: (e: React.MouseEvent) => void }) {
   const fill  = Math.min(100, (block.blockSize / BLOCK_CAP) * 100);
   const color = feeRateColor(block.medianFee);
   const [r, g, b] = hexToRgb(color);
   const gradient = `linear-gradient(to top, rgba(${r},${g},${b},0.82) 0%, rgba(${r},${g},${b},0.40) 100%)`;
 
   return (
-    <div
+    <Link
+      to={`/mempool-block/${block.index}`}
       className="xblock xblock-pending"
       title={pendingTip(block)}
+      onClick={onClick}
       draggable="false"
       onDragStart={(e) => e.preventDefault()}
     >
@@ -160,7 +163,7 @@ function PendingBlock({ block }: { block: MempoolBlock }) {
           ~ {(block.index + 1) * 2} mins
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -216,7 +219,7 @@ function ConfirmedBlock({
           <div className="xblock-time">{timeAgo(block.timestamp)}</div>
         </div>
         <div className="xblock-label xblock-label-confirmed">
-          {piconeroToXMR(block.reward, 3)} XMR
+          <XMRAmount piconero={block.reward} decimals={3} />
         </div>
       </div>
     </Link>

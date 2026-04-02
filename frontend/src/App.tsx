@@ -4,9 +4,11 @@ import NavBar from './components/NavBar';
 import Dashboard from './components/Dashboard';
 import BlockDetail from './components/BlockDetail';
 import TxDetail from './components/TxDetail';
+import MempoolBlockDetail from './components/MempoolBlockDetail';
 import { usePriceData, CURRENCIES } from './components/CurrencyBar';
 import About from './components/About';
 import { wsService, WSMessage, InitPayload, StatsPayload } from './services/websocket';
+import { PriceProvider } from './contexts/PriceContext';
 import type { AppState } from './types';
 import './index.css';
 
@@ -127,6 +129,7 @@ export default function App() {
   }, []);
 
   return (
+    <PriceProvider value={{ xmrPrice, selectedCurrency }}>
     <BrowserRouter>
       <div className="app">
         <NavBar />
@@ -146,21 +149,24 @@ export default function App() {
             />
             <Route path="/block/:hashOrHeight" element={<BlockDetail />} />
             <Route path="/tx/:txid" element={<TxDetail />} />
+            <Route path="/mempool-block/:index" element={<MempoolBlockDetail />} />
             <Route path="/about" element={<About />} />
           </Routes>
         </main>
 
         <footer className="app-footer">
           <div className="footer-content">
-            <div className={`ws-status ${state.connected ? 'ws-connected' : 'ws-disconnected'}`}>
-              <span className="ws-dot" />
-              <span className="ws-label">Mainnet</span>
-            </div>
-            <div className="footer-center">
-              <span>Node: <span className="mono">{state.networkStats?.version ?? 'Unknown'}</span></span>
+            <div className="footer-left">
+              <div className={`ws-status ${state.connected ? 'ws-connected' : 'ws-disconnected'}`}>
+                <span className="ws-dot" />
+                <span className="ws-label">Mainnet</span>
+              </div>
+              <span className="footer-node-version">
+                Node: <span className="mono">{state.networkStats?.version ?? 'Unknown'}</span>
+              </span>
             </div>
             <div className="theme-switcher">
-              <select 
+              <select
                 className="theme-select"
                 value={selectedCurrency}
                 onChange={(e) => handleSelectCurrency(e.target.value)}
@@ -171,7 +177,7 @@ export default function App() {
                   </option>
                 ))}
               </select>
-              <select 
+              <select
                 className="theme-select"
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
@@ -185,5 +191,6 @@ export default function App() {
         </footer>
       </div>
     </BrowserRouter>
+    </PriceProvider>
   );
 }

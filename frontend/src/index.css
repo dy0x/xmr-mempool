@@ -1442,6 +1442,109 @@ a:hover {
   color: var(--text);
 }
 
+.ring-item-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.ring-field-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ring-item-field .mono {
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.ring-members {
+  margin-top: 8px;
+}
+
+.ring-members-header {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.ring-members-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.ring-members-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 500;
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ring-members-table td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  vertical-align: top;
+}
+
+.ring-key-cell {
+  word-break: break-all;
+  color: var(--text-dim);
+  max-width: 300px;
+}
+
+.tx-io-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tx-io-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: var(--bg-card-dark);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.tx-io-index {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.tx-io-key {
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.tx-extra-field {
+  font-size: 11px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 0 0 6px;
+  text-decoration: underline;
+}
+
 .more-hint {
   font-size: 11px;
   color: var(--text-dim);
@@ -1919,9 +2022,14 @@ a:hover {
   gap: 20px;
 }
 
-.footer-center {
-  flex: 1;
-  text-align: center;
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.footer-node-version {
+  color: var(--text-dim);
 }
 
 .theme-switcher {
@@ -1956,4 +2064,48 @@ a:hover {
 .app-footer .mono {
   font-family: var(--font-mono);
   color: var(--text-bright);
+}
+
+/* ── XMR Amount hover tooltip ─────────────────────────────────────────────── */
+
+.xmr-amount {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+  border-bottom: 1px dashed var(--text-dim);
+  white-space: nowrap;
+}
+
+.xmr-amount-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-tooltip, #1a1a2e);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  z-index: 200;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+
+/* arrow */
+.xmr-amount-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--border);
+}
+
+.xmr-amount:hover .xmr-amount-tip {
+  display: block;
 }

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { RecentBlock } from '../types';
-import { formatBytes, piconeroToXMR, timeAgo } from '../types';
+import { formatBytes, timeAgo } from '../types';
+import XMRAmount from './XMRAmount';
 
 interface Props {
   recentBlocks: RecentBlock[];
@@ -65,7 +66,7 @@ export default function BlocksList({ recentBlocks }: Props) {
                 <td>{block.isOrphan ? '—' : block.nTx.toLocaleString()}</td>
                 <td>{block.isOrphan ? '—' : formatBytes(block.size)}</td>
                 <td className="reward-cell">
-                  {piconeroToXMR(block.reward, 4)} XMR
+                  <XMRAmount piconero={block.reward} decimals={4} />
                 </td>
                 <td className="hash-cell">
                   {block.isOrphan ? (

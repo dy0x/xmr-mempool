@@ -5,10 +5,6 @@
       "port": 18081,
       "user": "monero",
       "pass": "WsPs_7onqOlvSNlaHltNn7MkCNpVs7XIZKD8WKEgVp0="
-    },
-    {
-      "host": "node.supportxmr.com",
-      "port": 18081
     }
   ]
 }
