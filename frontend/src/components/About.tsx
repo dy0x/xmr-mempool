@@ -22,16 +22,16 @@ export default function About() {
       <div className="about-header">
         <div className="about-xmr-icon">ɱ</div>
         <h1 className="about-title">
-          <span style={{ color: '#ff6600' }}>XMR</span>mempool.space
+          <span className="brand-xmr">XMR</span><span className="brand-lens">Lens</span>
         </h1>
-        <p className="about-tagline">A real-time Monero mempool &amp; blockchain explorer</p>
+        <p className="about-tagline">A real-time Monero txpool &amp; blockchain explorer</p>
       </div>
 
       {/* Description */}
       <div className="about-card">
         <h2 className="about-section-title">What is this?</h2>
         <p className="about-body">
-          XMRmempool.space is an open-source, self-hosted blockchain explorer for the Monero network —
+          XMRLens is an open-source, self-hosted blockchain explorer for the Monero network —
           inspired by <a href="https://mempool.space" target="_blank" rel="noopener noreferrer">mempool.space</a>.
           It connects directly to a local Monero full node and shows live mempool activity,
           pending transaction blocks, fee estimates, network hashrate, and recent confirmed blocks.

@@ -46,7 +46,7 @@ export default function StatsBar({ mempoolInfo, networkStats, xmrPrice, selected
         sub="estimated"
       />
       <Stat
-        label="Total Emission"
+        label="Total Supply"
         value={networkStats?.totalEmission ? `${Math.floor(networkStats.totalEmission / 1e12).toLocaleString()}` : '—'}
         sub="circulating"
       />

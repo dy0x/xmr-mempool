@@ -8,7 +8,7 @@
  * that rises to represent how full the block is. Flat design, no 3D clipping.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MempoolBlock, RecentBlock } from '../types';
 import { feeRateColor, formatBytes, formatFeeRate, piconeroToXMR, timeAgo } from '../types';
@@ -19,7 +19,7 @@ interface Props {
 }
 
 const MAX_PENDING = 40;
-const MAX_RECENT  = 40;
+const MAX_RECENT  = 60;
 const BLOCK_CAP   = 300_000; // bytes — used for fill %
 
 export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
@@ -29,21 +29,63 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
   const pending = mempoolBlocks.slice(0, MAX_PENDING);
   const recent  = recentBlocks.slice(0, MAX_RECENT);
 
-  // Ensure the chain defaults to being perfectly centered on the arrow
+  // Drag-to-scroll state
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [dragMoved, setDragMoved] = useState(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setIsDragging(true);
+    setDragMoved(false);
+    setStartX(e.pageX - el.offsetLeft);
+    setScrollLeft(el.scrollLeft);
+  };
+
+  const stopDragging = () => {
+    setIsDragging(false);
+    // Use a tiny timeout so the click event on Link can be captured/prevented if needed
+    setTimeout(() => setDragMoved(false), 0);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // Scroll speed factor
+    if (Math.abs(walk) > 5) setDragMoved(true);
+    scrollRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  // Prevent clicking blocks if we were dragging
+  const handleBlockClick = (e: React.MouseEvent) => {
+    if (dragMoved) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
+  // Ensure the chain defaults to being aligned with the content margin (scrollLeft 0)
   useEffect(() => {
     const scrollEl = scrollRef.current;
-    const arrowEl = arrowRef.current;
-    if (!scrollEl || !arrowEl) return;
+    if (!scrollEl) return;
 
     requestAnimationFrame(() => {
-      const arrowCenter = arrowEl.offsetLeft + (arrowEl.offsetWidth / 2);
-      const viewportHalf = scrollEl.clientWidth / 2;
-      scrollEl.scrollLeft = arrowCenter - viewportHalf;
+      scrollEl.scrollLeft = 0;
     });
-  }, [recent[0]?.height, mempoolBlocks.length]);
+  }, [recent[0]?.height]); // Recalculate if the latest block changes, but keep it start-aligned
 
   return (
-    <div className="blockchain-scroll-outer" ref={scrollRef}>
+    <div 
+      className={`blockchain-scroll-outer ${isDragging ? 'is-dragging' : ''}`} 
+      ref={scrollRef}
+      onMouseDown={handleMouseDown}
+      onMouseLeave={stopDragging}
+      onMouseUp={stopDragging}
+      onMouseMove={handleMouseMove}
+    >
       <div className="blockchain-scroll-inner">
 
         {/* Pending blocks — oldest left, newest right (closest to arrow) */}
@@ -71,7 +113,12 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
         {/* Confirmed blocks — newest left, older right */}
         <div className="block-row block-row-confirmed">
           {recent.map((b, i) => (
-            <ConfirmedBlock key={b.height} block={b} isLatest={i === 0} />
+            <ConfirmedBlock 
+              key={b.height} 
+              block={b} 
+              isLatest={i === 0} 
+              onClick={handleBlockClick} 
+            />
           ))}
         </div>
 
@@ -92,6 +139,8 @@ function PendingBlock({ block }: { block: MempoolBlock }) {
     <div
       className="xblock xblock-pending"
       title={pendingTip(block)}
+      draggable="false"
+      onDragStart={(e) => e.preventDefault()}
     >
       <div className="xblock-face">
         <div className="xblock-fill" style={{ background: gradient, height: `${fill}%` }} />
@@ -127,7 +176,15 @@ function pendingTip(b: MempoolBlock) {
 
 // ── Confirmed block ───────────────────────────────────────────────────────────
 
-function ConfirmedBlock({ block, isLatest }: { block: RecentBlock; isLatest: boolean }) {
+function ConfirmedBlock({ 
+  block, 
+  isLatest, 
+  onClick 
+}: { 
+  block: RecentBlock; 
+  isLatest: boolean;
+  onClick: (e: React.MouseEvent) => void;
+}) {
   const fill = Math.min(100, (block.size / BLOCK_CAP) * 100);
   const fillGrad = `linear-gradient(to top,
     rgba(255,102,0,0.80) 0%,
@@ -139,11 +196,19 @@ function ConfirmedBlock({ block, isLatest }: { block: RecentBlock; isLatest: boo
       to={`/block/${block.height}`}
       className={`xblock xblock-confirmed${isLatest ? ' xblock-latest' : ''}`}
       title={confirmedTip(block)}
+      onClick={onClick}
+      draggable="false"
+      onDragStart={(e) => e.preventDefault()}
     >
       <div className="xblock-face">
         <div className="xblock-fill" style={{ background: fillGrad, height: `${fill}%` }} />
+        
+        {block.miner === 'p2pool' && (
+          <div className="xblock-miner-tag-overlay" title="Mined by P2Pool" />
+        )}
+
         <div className="xblock-content">
-          <div className="xblock-height" style={{ color: isLatest ? '#ff6600' : '#e4e4e4' }}>
+          <div className={`xblock-height${isLatest ? ' is-latest' : ''}`}>
             {block.height.toLocaleString()}
           </div>
           <div className="xblock-txcount">{block.nTx.toLocaleString()} transactions</div>

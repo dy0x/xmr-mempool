@@ -23,14 +23,19 @@ function medianFee(s: FeeSnapshot): number {
 /** Map a fee rate (piconero/byte) to a CSS colour. */
 function feeColor(v: number): string {
   // Thresholds tuned to typical XMR fee ranges (piconero/byte)
-  if (v <= 0)       return '#3bd16f'; // green  — zero/empty
-  if (v < 80_000)   return '#3bd16f'; // green  — cheap
-  if (v < 200_000)  return '#faad14'; // yellow — normal
-  if (v < 500_000)  return '#ff7535'; // orange — busy
+  if (v <= 0) return '#3bd16f'; // green  — zero/empty
+  if (v < 80_000) return '#3bd16f'; // green  — cheap
+  if (v < 200_000) return '#faad14'; // yellow — normal
+  if (v < 500_000) return '#ff7535'; // orange — busy
   return '#e84142';                   // red    — congested
 }
 
-export default function FeeChart() {
+interface FeeChartProps {
+  xmrPrice?: number;
+  selectedCurrency?: string;
+}
+
+export default function FeeChart({ xmrPrice, selectedCurrency }: FeeChartProps) {
   const [data, setData] = useState<FeeSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; snap: FeeSnapshot } | null>(null);
@@ -55,7 +60,7 @@ export default function FeeChart() {
     <div className="fee-chart-card">
       <div className="fee-chart-header">
         <div className="fee-chart-title">
-          Fee Rate History <span className="fee-chart-subtitle">(last 2 hours)</span>
+          Fee Rate History
         </div>
         <div className="fee-chart-legend">
           <span className="legend-item"><span className="legend-dot" style={{ background: '#3bd16f' }} />Low</span>
@@ -78,6 +83,8 @@ export default function FeeChart() {
             svgRef={svgRef}
             tooltip={tooltip}
             onTooltip={setTooltip}
+            xmrPrice={xmrPrice}
+            selectedCurrency={selectedCurrency}
           />
         )}
       </div>
@@ -92,9 +99,14 @@ interface ChartSVGProps {
   svgRef: React.RefObject<SVGSVGElement>;
   tooltip: { x: number; y: number; snap: FeeSnapshot } | null;
   onTooltip: (t: { x: number; y: number; snap: FeeSnapshot } | null) => void;
+  xmrPrice?: number;
+  selectedCurrency?: string;
 }
 
-function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
+// Approximate size of a typical 2-in/2-out RingCT transaction (bytes)
+const TYPICAL_TX_BYTES = 1400;
+
+function ChartSVG({ data, svgRef, tooltip, onTooltip, xmrPrice, selectedCurrency }: ChartSVGProps) {
   const [size, setSize] = useState({ width: 900, height: 160 });
 
   useEffect(() => {
@@ -119,15 +131,21 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
   const cH = H - PAD.top - PAD.bottom;
 
   const fees = data.map(medianFee).filter(v => v > 0);
-  const maxFee = (Math.max(...fees) * 1.15) || 1;
-  const minFee = Math.max(0, Math.min(...fees) * 0.85);
+  const sorted = [...fees].sort((a, b) => a - b);
+  // Use P95 as the scale ceiling so a single high-fee outlier doesn't crush the chart
+  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ?? 1;
+  const maxFee = (p95 * 1.25) || 1;
+  const minFee = Math.max(0, (sorted[0] ?? 0) * 0.85);
 
   const t0 = data[0].ts;
   const t1 = data[data.length - 1].ts;
   const tRange = t1 - t0 || 1;
 
   const toX = (ts: number) => PAD.left + ((ts - t0) / tRange) * cW;
-  const toY = (v: number) => PAD.top + cH - ((v - minFee) / (maxFee - minFee)) * cH;
+  const toY = (v: number) => {
+    const clamped = Math.max(minFee, Math.min(v, maxFee));
+    return PAD.top + cH - ((clamped - minFee) / (maxFee - minFee)) * cH;
+  };
 
   // Build area path
   const pts = data.map(d => ({ x: toX(d.ts), y: toY(medianFee(d)), fee: medianFee(d) }));
@@ -158,10 +176,10 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
   });
 
   const formatFeeShort = (v: number): string => {
-    const m = v / 1e9;
-    if (m < 0.001) return `${Math.round(v / 1000)}K ρ`;
-    if (m < 1) return `${m.toFixed(2)}m`;
-    return `${m.toFixed(1)}m`;
+    if (v < 1_000) return `${Math.round(v)} ρ`;
+    if (v < 1_000_000) return `${Math.round(v / 1000)}K ρ`;
+    if (v < 1_000_000_000) return `${(v / 1_000_000).toFixed(1)}M ρ`;
+    return `${(v / 1_000_000_000).toFixed(1)}G ρ`;
   };
 
   const formatTime = (ts: number): string => {
@@ -280,23 +298,57 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip }: ChartSVGProps) {
       </svg>
 
       {/* Tooltip popup */}
-      {tooltip && (
-        <div
-          className="chart-tooltip"
-          style={{
-            left: Math.min(tooltip.x / W * 100, 75) + '%',
-            top: '8px',
-          }}
-        >
-          <div className="chart-tooltip-time">{formatTime(tooltip.snap.ts)}</div>
-          <div className="chart-tooltip-row">
-            <span className="chart-tooltip-dot" style={{ background: feeColor(medianFee(tooltip.snap)) }} />
-            <span className="chart-tooltip-label">Median fee:</span>
-            <span className="chart-tooltip-val">{formatFeeShort(medianFee(tooltip.snap))}</span>
-          </div>
-          <div className="chart-tooltip-pool">Pool: {tooltip.snap.txPoolSize.toLocaleString()} transactions</div>
+      {tooltip && <TooltipPopup
+        snap={tooltip.snap}
+        x={tooltip.x}
+        W={W}
+        xmrPrice={xmrPrice}
+        selectedCurrency={selectedCurrency}
+        formatTime={formatTime}
+        formatFeeShort={formatFeeShort}
+      />}
+    </div>
+  );
+}
+
+function TooltipPopup({ snap, x, W, xmrPrice, selectedCurrency, formatTime, formatFeeShort }: {
+  snap: FeeSnapshot;
+  x: number;
+  W: number;
+  xmrPrice?: number;
+  selectedCurrency?: string;
+  formatTime: (ts: number) => string;
+  formatFeeShort: (v: number) => string;
+}) {
+  const fee = medianFee(snap);
+  const typicalXMR = fee * TYPICAL_TX_BYTES / 1e12;
+  const typicalFiat = xmrPrice != null ? typicalXMR * xmrPrice : null;
+  const currencyCode = (selectedCurrency ?? 'usd').toUpperCase();
+
+  return (
+    <div
+      className="chart-tooltip"
+      style={{ left: Math.min(x / W * 100, 75) + '%', top: '8px' }}
+    >
+      <div className="chart-tooltip-time">{formatTime(snap.ts)}</div>
+      <div className="chart-tooltip-row">
+        <span className="chart-tooltip-dot" style={{ background: feeColor(fee) }} />
+        <span className="chart-tooltip-label">Median fee:</span>
+        <span className="chart-tooltip-val">{formatFeeShort(fee)}</span>
+      </div>
+      <div className="chart-tooltip-row chart-tooltip-conversion">
+        <span className="chart-tooltip-label">Typical tx:</span>
+        <span className="chart-tooltip-val">{typicalXMR.toFixed(6)} XMR</span>
+      </div>
+      {typicalFiat != null && (
+        <div className="chart-tooltip-row chart-tooltip-conversion">
+          <span className="chart-tooltip-label" />
+          <span className="chart-tooltip-val">
+            {typicalFiat < 0.01 ? typicalFiat.toFixed(4) : typicalFiat.toFixed(2)} {currencyCode}
+          </span>
         </div>
       )}
+      <div className="chart-tooltip-pool">Pool: {snap.txPoolSize.toLocaleString()} txs</div>
     </div>
   );
 }

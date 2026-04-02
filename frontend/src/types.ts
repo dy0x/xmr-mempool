@@ -20,6 +20,8 @@ export interface RecentBlock {
   reward: number;      // piconero
   medianFee?: number;
   minorVersion: number;
+  isOrphan: boolean;
+  miner?: 'p2pool' | string;
 }
 
 export interface MempoolInfo {

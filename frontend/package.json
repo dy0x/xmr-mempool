@@ -1,7 +1,7 @@
 {
   "name": "xmr-mempool-frontend",
   "version": "1.0.0",
-  "description": "Monero mempool explorer — mempool.space for XMR",
+  "description": "Monero mempool explorer — XMRLens for XMR",
   "type": "module",
   "scripts": {
     "dev": "vite",

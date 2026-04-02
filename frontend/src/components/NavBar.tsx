@@ -53,9 +53,7 @@ export default function NavBar() {
         <Link to="/" className="navbar-brand">
           <XmrLogo />
           <span className="brand-text">
-            <span className="brand-xmr">XMR</span>
-            <span className="brand-mempool">mempool</span>
-            <span className="brand-space">.space</span>
+            <span className="brand-xmr">XMR</span><span className="brand-lens">Lens</span>
           </span>
         </Link>
 
@@ -95,24 +93,6 @@ export default function NavBar() {
 
 function XmrLogo() {
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="14" cy="14" r="14" fill="#FF6600"/>
-      <path
-        d="M6.5 20.5V11.5l7.5 7.5 7.5-7.5v9"
-        stroke="white"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <path
-        d="M9.5 20.5V16l4.5 3.5 4.5-3.5v4.5"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </svg>
+    <div className="navbar-logo-icon"><span>ɱ</span></div>
   );
 }

@@ -51,7 +51,7 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
 
       {/* Fee rate chart */}
       <section className="chart-section">
-        <FeeChart />
+        <FeeChart xmrPrice={xmrPrice} selectedCurrency={selectedCurrency} />
       </section>
 
       {/* Block table */}

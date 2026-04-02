@@ -4,7 +4,7 @@ import NavBar from './components/NavBar';
 import Dashboard from './components/Dashboard';
 import BlockDetail from './components/BlockDetail';
 import TxDetail from './components/TxDetail';
-import CurrencyBar, { usePriceData } from './components/CurrencyBar';
+import { usePriceData, CURRENCIES } from './components/CurrencyBar';
 import About from './components/About';
 import { wsService, WSMessage, InitPayload, StatsPayload } from './services/websocket';
 import type { AppState } from './types';
@@ -83,6 +83,16 @@ export default function App() {
   const priceChange24h = priceData.changes[selectedCurrency] ?? null;
   const priceFetchedAt = priceData.fetchedAt;
 
+  // Theme selection
+  const [theme, setTheme] = useState<string>(() => {
+    try { return localStorage.getItem('xmr-theme') ?? 'XMR'; } catch { return 'XMR'; }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('xmr-theme', theme); } catch { /* ignore */ }
+  }, [theme]);
+
   useEffect(() => {
     const unsubMsg = wsService.onMessage((msg: WSMessage) => {
       switch (msg.type) {
@@ -146,14 +156,33 @@ export default function App() {
               <span className="ws-dot" />
               <span className="ws-label">Mainnet</span>
             </div>
-            <span>Node Version: <span className="mono">{state.networkStats?.version ?? 'Unknown'}</span></span>
+            <div className="footer-center">
+              <span>Node: <span className="mono">{state.networkStats?.version ?? 'Unknown'}</span></span>
+            </div>
+            <div className="theme-switcher">
+              <select 
+                className="theme-select"
+                value={selectedCurrency}
+                onChange={(e) => handleSelectCurrency(e.target.value)}
+              >
+                {CURRENCIES.map(c => (
+                  <option key={c.code} value={c.code}>
+                    {c.label} ({c.symbol})
+                  </option>
+                ))}
+              </select>
+              <select 
+                className="theme-select"
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+              >
+                <option value="XMR">Monero (Default)</option>
+                <option value="dusk">Dusk</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
           </div>
         </footer>
-
-        <CurrencyBar
-          selectedCurrency={selectedCurrency}
-          onSelectCurrency={handleSelectCurrency}
-        />
       </div>
     </BrowserRouter>
   );

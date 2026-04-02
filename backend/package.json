@@ -1,7 +1,7 @@
 {
   "name": "xmr-mempool-backend",
   "version": "1.0.0",
-  "description": "Monero mempool explorer backend — like mempool.space for XMR",
+  "description": "Monero mempool explorer backend — like XMRLens for XMR",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",

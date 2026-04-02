@@ -1,5 +1,5 @@
 /**
- * XMR Mempool — Express + WebSocket server
+ * XMRLens — Express + WebSocket server
  *
  * WebSocket protocol (mirrors mempool.space):
  *   Client → Server:  { action: "want", data: ["blocks","mempool-blocks","stats"] }
@@ -43,6 +43,8 @@ interface ClientState {
 
 const clients = new Map<WebSocket, ClientState>();
 
+let lastBroadcastTipHeight = -1;
+
 function send(ws: WebSocket, type: string, payload: unknown) {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type, payload }));
@@ -50,6 +52,10 @@ function send(ws: WebSocket, type: string, payload: unknown) {
 }
 
 function broadcastStateUpdate(state: MempoolState) {
+  const tipHeight = state.recentBlocks[0]?.height ?? -1;
+  const blockChanged = tipHeight !== lastBroadcastTipHeight;
+  if (blockChanged) lastBroadcastTipHeight = tipHeight;
+
   for (const [ws, clientState] of clients.entries()) {
     if (ws.readyState !== WebSocket.OPEN) continue;
 
@@ -63,8 +69,8 @@ function broadcastStateUpdate(state: MempoolState) {
         networkStats: state.networkStats,
       });
     }
-    if (clientState.subscriptions.has('blocks')) {
-      send(ws, 'blocks', state.recentBlocks.slice(0, 8));
+    if (blockChanged && clientState.subscriptions.has('blocks')) {
+      send(ws, 'blocks', state.recentBlocks.slice(0, 60));
     }
   }
 }
@@ -82,7 +88,7 @@ wss.on('connection', (ws: WebSocket) => {
   const state = mempoolManager.getState();
   if (state) {
     send(ws, 'init', {
-      blocks: state.recentBlocks.slice(0, 8),
+      blocks: state.recentBlocks.slice(0, 60),
       mempoolInfo: state.info,
       mempoolBlocks: state.mempoolBlocks,
       fees: state.fees,
@@ -149,7 +155,7 @@ setInterval(() => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 httpServer.listen(PORT, async () => {
-  console.log(`\n🔷 XMR Mempool backend running at http://localhost:${PORT}`);
+  console.log(`\n🔷 XMRLens backend running at http://localhost:${PORT}`);
   console.log(`   REST API: http://localhost:${PORT}/api/v1/init-data`);
   console.log(`   WebSocket: ws://localhost:${PORT}`);
   console.log(`\n   Connecting to Monero node…`);

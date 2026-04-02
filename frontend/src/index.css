@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════════
-   XMR Mempool — Global Styles
+   XMRLens — Global Styles
    Visually inspired by mempool.space; Monero orange as accent colour.
    ════════════════════════════════════════════════════════════════════════════ */
 
@@ -14,13 +14,7 @@
 }
 
 :root {
-  --bg: #1d1f2e;
-  --bg-card: #252740;
-  --bg-card-dark: #1a1c2b;
-  --border: #2e3050;
-  --text: #d4d4d4;
-  --text-dim: #7a7d9a;
-  --text-bright: #f0f0f0;
+  /* Common variables across all themes */
   --xmr-orange: #ff6600;
   --xmr-orange2: #e05500;
   --green: #3bd16f;
@@ -30,6 +24,61 @@
   --radius: 8px;
   --radius-sm: 4px;
   --transition: 200ms ease;
+
+  /* Fallback / Default XMR Theme */
+  --bg: #000000;
+  --bg-card: #121212;
+  --bg-card-dark: #0a0a0a;
+  --navbar-bg: #000000;
+  --block-face: #080808;
+  --block-text: #ffffff;
+  --block-text-dim: rgba(255, 255, 255, 0.7);
+  --border: #222222;
+  --text: #f0f0f0;
+  --text-dim: #888888;
+  --text-bright: #ffffff;
+}
+
+[data-theme="XMR"] {
+  --bg: #000000;
+  --bg-card: #121212;
+  --bg-card-dark: #0a0a0a;
+  --navbar-bg: #000000;
+  --block-face: #080808;
+  --block-text: #ffffff;
+  --block-text-dim: rgba(255, 255, 255, 0.7);
+  --border: #222222;
+  --text: #f0f0f0;
+  --text-dim: #888888;
+  --text-bright: #ffffff;
+}
+
+[data-theme="dusk"] {
+  --bg: #1d1f2e;
+  --bg-card: #252740;
+  --bg-card-dark: #1a1c2b;
+  --navbar-bg: #13141f;
+  --block-face: #0e0f1a;
+  --block-text: #ffffff;
+  --block-text-dim: rgba(255, 255, 255, 0.7);
+  --border: #2e3050;
+  --text: #d4d4d4;
+  --text-dim: #7a7d9a;
+  --text-bright: #f0f0f0;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-card: #f8f8f8;
+  --bg-card-dark: #f0f0f0;
+  --navbar-bg: #ffffff;
+  --block-face: #ffffff;
+  --block-text: #222222;
+  --block-text-dim: #666666;
+  --border: #e0e0e0;
+  --text: #222222;
+  --text-dim: #666666;
+  --text-bright: #000000;
 }
 
 html,
@@ -77,7 +126,7 @@ a:hover {
 /* ── Navbar ───────────────────────────────────────────────────────────────── */
 
 .navbar {
-  background: #13141f;
+  background: var(--navbar-bg);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -102,6 +151,27 @@ a:hover {
   flex-shrink: 0;
 }
 
+.navbar-logo-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--xmr-orange);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: normal;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(255, 102, 0, 0.3);
+}
+
+.navbar-logo-icon span {
+  transform: translateY(-4px);
+  /* Aggressive lift to ensure visual center */
+}
+
 .brand-text {
   font-size: 18px;
   font-weight: 700;
@@ -112,12 +182,8 @@ a:hover {
   color: var(--xmr-orange);
 }
 
-.brand-mempool {
+.brand-lens {
   color: var(--text-bright);
-}
-
-.brand-space {
-  color: var(--text-dim);
 }
 
 .network-pill {
@@ -365,8 +431,8 @@ a:hover {
 /* ── Blockchain scroll view ───────────────────────────────────────────────── */
 
 .blockchain-section {
-  margin-bottom: 28px;
-  padding: 20px 0 28px;
+  margin-bottom: 0px;
+  padding: 0px 0 0px;
   width: 100vw;
   margin-left: calc(-50vw + 50%);
   margin-right: calc(-50vw + 50%);
@@ -380,6 +446,23 @@ a:hover {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 102, 0, 0.3) transparent;
   padding: 16px 0;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Hide scrollbar */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.blockchain-scroll-outer::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari and Opera */
+}
+
+.blockchain-scroll-outer.is-dragging {
+  cursor: grabbing;
 }
 
 .blockchain-scroll-outer::-webkit-scrollbar {
@@ -395,11 +478,14 @@ a:hover {
 .blockchain-scroll-inner {
   display: flex;
   align-items: flex-end;
-  /* align to bottom so 3D shadow falls correctly */
   gap: 0;
   width: max-content;
-  /* Extra padding so edge blocks' shadows aren't clipped */
-  padding: 20px 16px 28px;
+  /* Align left padding with .main-content (max-width 1400, padding 16px) */
+  padding-left: calc(max(16px, (100vw - 1400px) / 2 + 16px));
+  padding-right: 50vw;
+  /* Large right padding to allow scrolling deep into history */
+  padding-top: 20px;
+  padding-bottom: 28px;
 }
 
 /* Block rows */
@@ -542,12 +628,13 @@ a:hover {
   letter-spacing: 0.3px;
   text-transform: uppercase;
   z-index: 3;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.35);
+  border-top: 1px solid rgba(128, 128, 128, 0.1);
+  background: var(--bg-card-dark);
+  opacity: 0.8;
 }
 
 .xblock-label-pending {
-  color: var(--text-dim);
+  color: var(--block-text-dim);
 }
 
 .xblock-label-confirmed {
@@ -566,32 +653,31 @@ a:hover {
   font-size: 14px;
   font-weight: 700;
   font-family: var(--font-mono);
+  color: var(--block-text);
 }
 
-.xblock-txcount,
-.xblock-size,
-.xblock-time {
-  font-size: 11px;
-  color: var(--text-dim);
+.xblock-height.is-latest {
+  color: var(--xmr-orange);
 }
+
 
 .xblock-empty-label {
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--block-text-dim);
   font-style: italic;
 }
 
 /* Darker face so gradient colours pop against it */
 .xblock-face {
-  background: #0e0f1a;
+  background: var(--block-face);
 }
 
-/* Typography — always bright white inside blocks */
+/* Typography — use dynamic variables for themes */
 .xblock-txcount,
 .xblock-size,
 .xblock-time {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7) !important;
+  color: var(--block-text-dim);
 }
 
 /* Pending: dimmed */
@@ -618,6 +704,29 @@ a:hover {
 .xblock:hover .xblock-face {
   border-color: rgba(255, 102, 0, 0.35);
 }
+
+/* Miner tag shown as overlay inside confirmed blocks */
+.xblock-miner-tag-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 102, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 8px rgba(255, 102, 0, 0.4);
+}
+
+.xblock-miner-tag-overlay svg {
+  margin-right: 0 !important;
+  /* Center the icon */
+}
+
 
 /* Legacy */
 .empty-mempool {
@@ -968,6 +1077,11 @@ a:hover {
   color: var(--text-bright);
 }
 
+.chart-tooltip-conversion {
+  opacity: 0.75;
+  font-size: 10px;
+}
+
 .chart-tooltip-pool {
   margin-top: 5px;
   padding-top: 5px;
@@ -1079,6 +1193,67 @@ a:hover {
 .hash-link:hover {
   color: var(--xmr-orange);
 }
+
+/* Orphaned blocks */
+.orphan-row td {
+  opacity: 0.45;
+  background: rgba(232, 65, 66, 0.04);
+}
+
+.orphan-row:hover td {
+  opacity: 0.6;
+  background: rgba(232, 65, 66, 0.08);
+}
+
+.block-height-orphan {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--red, #e84142);
+  cursor: default;
+}
+
+.orphan-hash {
+  color: var(--red, #e84142);
+  opacity: 0.6;
+}
+
+/* Miner badges */
+.miner-cell {
+  white-space: nowrap;
+}
+
+.miner-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.p2pool-badge {
+  background: rgba(255, 102, 0, 0.15);
+  color: var(--xmr-orange);
+  border: 1px solid rgba(255, 102, 0, 0.3);
+  gap: 2px;
+}
+
+.p2pool-badge:hover {
+  background: rgba(255, 102, 0, 0.25);
+}
+
+.orphan-badge {
+  background: rgba(232, 65, 66, 0.12);
+  color: #e84142;
+  border: 1px solid rgba(232, 65, 66, 0.25);
+}
+
+.unknown-badge {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
 
 /* ── Detail pages ─────────────────────────────────────────────────────────── */
 
@@ -1533,26 +1708,7 @@ a:hover {
   margin-right: 2px;
 }
 
-/* ── Currency Bar (sticky footer) ────────────────────────────────────────── */
-
-.currency-bar {
-  margin-top: auto;
-  height: 44px;
-  background: #10111c;
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-}
-
-.currency-bar-inner {
-  max-width: 1400px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+/* ── Combined Footer (sticky) ────────────────────────────────────────────── */
 
 .currency-price-block {
   display: flex;
@@ -1746,8 +1902,7 @@ a:hover {
 /* ── App Footer ───────────────────────────────────────────────────────────── */
 
 .app-footer {
-  text-align: center;
-  padding: 10px 24px;
+  padding: 12px 24px;
   font-size: 11px;
   color: var(--text-dim);
   border-top: 1px solid var(--border);
@@ -1756,10 +1911,46 @@ a:hover {
 }
 
 .footer-content {
+  max-width: 1400px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 20px;
+}
+
+.footer-center {
+  flex: 1;
+  text-align: center;
+}
+
+.theme-switcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-select {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 4px 28px 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all var(--transition);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath stroke='%237a7d9a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.theme-select:hover {
+  border-color: var(--xmr-orange);
+  color: var(--text-bright);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath stroke='%23ff6600' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
 }
 
 .app-footer .mono {

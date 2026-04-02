@@ -1,6 +1,6 @@
 #!/bin/bash
 # ════════════════════════════════════════════════════════════════════════════
-# XMR Mempool — start script
+# XMRLens — start script
 # Starts both backend (port 3001) and frontend dev server (port 4200)
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -9,7 +9,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo ""
-echo "🔷 XMR Mempool — Monero Explorer"
+echo "🔷 XMRLens — Monero Explorer"
 echo "══════════════════════════════════"
 
 # ── Backend ──────────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ echo "  Frontend PID: $FRONTEND_PID (http://localhost:4200)"
 
 echo ""
 echo "══════════════════════════════════"
-echo "✅ XMR Mempool running!"
+echo "✅ XMRLens running!"
 echo "   Open: http://localhost:4200"
 echo "══════════════════════════════════"
 echo ""
