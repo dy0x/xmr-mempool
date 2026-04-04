@@ -383,6 +383,12 @@ class MoneroRPC {
     return this.rest<{ height: number; status: string }>('get_height', 'GET');
   }
 
+  async getOuts(outputs: Array<{ amount: number; index: number }>): Promise<{
+    outs: Array<{ key: string; mask: string; unlocked: boolean; height: number; txid: string }>;
+  }> {
+    return this.jsonRpc('get_outs', { outputs, get_txid: false });
+  }
+
 }
 
 // ── Singleton ─────────────────────────────────────────────────────────────────

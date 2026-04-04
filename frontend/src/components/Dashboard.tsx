@@ -2,8 +2,11 @@ import type { AppState } from '../types';
 import StatsBar from './StatsBar';
 import MempoolBlocks from './MempoolBlocks';
 import FeesBox from './FeesBox';
-import BlocksList from './BlocksList';
+import MempoolTxList from './MempoolTxList';
 import FeeChart from './FeeChart';
+
+import type { RecentBlock, MempoolInfo, NetworkStats } from '../types';
+import { formatBytes, piconeroToXMR, formatFeeRate } from '../types';
 
 interface Props {
   state: AppState;
@@ -11,9 +14,10 @@ interface Props {
   xmrPrice?: number;
   priceChange24h?: number | null;
   priceFetchedAt?: number;
+  onAppendBlocks: (blocks: RecentBlock[]) => void;
 }
 
-export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChange24h, priceFetchedAt }: Props) {
+export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChange24h, priceFetchedAt, onAppendBlocks }: Props) {
   const { mempoolBlocks, recentBlocks, mempoolInfo, fees, networkStats, loading } = state;
 
   if (loading) {
@@ -21,7 +25,7 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
       <div className="loading-screen">
         <div className="loading-spinner" />
         <div className="loading-text">Connecting to Monero node…</div>
-        <div className="loading-sub">Fetching mempool and recent blocks</div>
+        <div className="loading-sub">Fetching txpool and recent blocks</div>
       </div>
     );
   }
@@ -40,32 +44,25 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
 
       {/* Main visualisation: mempool ←→ blockchain */}
       <section className="blockchain-section">
-        <MempoolBlocks mempoolBlocks={mempoolBlocks} recentBlocks={recentBlocks} />
+        <MempoolBlocks mempoolBlocks={mempoolBlocks} recentBlocks={recentBlocks} onAppendBlocks={onAppendBlocks} />
       </section>
 
-      {/* Bottom row: fee box + info */}
+      {/* Fee estimates + mempool stats */}
       <section className="bottom-row">
         <FeesBox fees={fees} selectedCurrency={selectedCurrency} xmrPrice={xmrPrice} mempoolBlocks={mempoolBlocks} />
         <MempoolSummary mempoolInfo={mempoolInfo} networkStats={networkStats} />
       </section>
 
-      {/* Fee rate chart */}
-      <section className="chart-section">
-        <FeeChart />
-      </section>
-
-      {/* Block table */}
-      <section className="blocks-section">
-        <BlocksList recentBlocks={recentBlocks} />
+      {/* Fee chart + live tx feed side by side */}
+      <section className="chart-tx-row">
+        <FeeChart xmrPrice={xmrPrice} selectedCurrency={selectedCurrency} />
+        <MempoolTxList />
       </section>
     </div>
   );
 }
 
 // ── Mempool summary card ──────────────────────────────────────────────────────
-
-import type { MempoolInfo, NetworkStats } from '../types';
-import { formatBytes, piconeroToXMR } from '../types';
 
 function MempoolSummary({
   mempoolInfo,
@@ -76,7 +73,7 @@ function MempoolSummary({
 }) {
   return (
     <div className="mempool-summary">
-      <div className="summary-title">Mempool</div>
+      <div className="summary-title">Txpool</div>
       <div className="summary-grid">
         <SummaryItem label="Pending transactions" value={mempoolInfo?.count.toLocaleString() ?? '—'} />
         <SummaryItem
@@ -91,7 +88,7 @@ function MempoolSummary({
           label="Min fee rate"
           value={
             mempoolInfo && mempoolInfo.memPoolMinFee > 0
-              ? `${mempoolInfo.memPoolMinFee.toLocaleString()} ρ/B`
+              ? formatFeeRate(mempoolInfo.memPoolMinFee)
               : '—'
           }
         />

@@ -20,6 +20,8 @@ export interface RecentBlock {
   reward: number;      // piconero
   medianFee?: number;
   minorVersion: number;
+  isOrphan: boolean;
+  miner?: 'p2pool' | string;
 }
 
 export interface MempoolInfo {
@@ -78,12 +80,13 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-/** Format fee rate (piconero/byte) as millinero/byte for readability */
+/** Format fee rate (piconero/byte) as XMR/kB */
 export function formatFeeRate(picoPerByte: number): string {
-  const milliPerByte = picoPerByte / 1e9;
-  if (milliPerByte < 0.001) return `${picoPerByte.toLocaleString()} ρ/B`;
-  if (milliPerByte < 1) return `${milliPerByte.toFixed(3)} mXMR/B`;
-  return `${milliPerByte.toFixed(2)} mXMR/B`;
+  if (picoPerByte <= 0) return '0 XMR/kB';
+  const xmrPerKb = (picoPerByte * 1024) / 1e12;
+  // toFixed(7) covers the full realistic Monero fee range without scientific notation,
+  // then strip trailing zeros for a clean result.
+  return xmrPerKb.toFixed(7).replace(/\.?0+$/, '') + ' XMR/kB';
 }
 
 /** Format hashrate in human units */

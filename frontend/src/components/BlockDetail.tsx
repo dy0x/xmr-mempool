@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { formatBytes, piconeroToXMR, timeAgo } from '../types';
+import { formatBytes, timeAgo } from '../types';
+import XMRAmount from './XMRAmount';
 
 interface BlockData {
   height: number;
@@ -65,15 +66,14 @@ export default function BlockDetail() {
         <DetailRow label="Timestamp" value={`${new Date(block.timestamp * 1000).toUTCString()} (${timeAgo(block.timestamp)})`} />
         <DetailRow label="Transactions" value={block.nTx.toLocaleString()} />
         <DetailRow label="Size" value={formatBytes(block.size)} />
-        <DetailRow label="Weight" value={formatBytes(block.weight)} />
         <DetailRow label="Difficulty" value={block.difficulty.toLocaleString()} />
-        <DetailRow label="Block reward" value={`${piconeroToXMR(block.reward, 6)} XMR`} />
+        <DetailRow label="Block reward" value={<XMRAmount piconero={block.reward} decimals={6} />} />
         <DetailRow label="Nonce" value={block.nonce.toLocaleString()} />
         <DetailRow label="Version" value={`${block.majorVersion}.${block.minorVersion}`} />
         <DetailRow label="Miner TX" value={block.minerTxHash} mono link={`/tx/${block.minerTxHash}`} />
       </div>
 
-      {block.txHashes.length > 0 && (
+      {(block.txHashes?.length ?? 0) > 0 && (
         <div className="detail-txlist">
           <h2>Transactions ({block.txHashes.length})</h2>
           <div className="tx-hash-list">
@@ -96,7 +96,7 @@ function DetailRow({
   link,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   mono?: boolean;
   link?: string;
 }) {
@@ -104,7 +104,7 @@ function DetailRow({
     <div className="detail-row">
       <div className="detail-row-label">{label}</div>
       <div className={`detail-row-value ${mono ? 'mono' : ''}`}>
-        {link ? <Link to={link}>{value}</Link> : value}
+        {link && typeof value === 'string' ? <Link to={link}>{value}</Link> : value}
       </div>
     </div>
   );

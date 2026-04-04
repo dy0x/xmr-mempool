@@ -20,27 +20,27 @@ export default function About() {
 
       {/* Header */}
       <div className="about-header">
-        <div className="about-xmr-icon">ɱ</div>
+        <img src="/xmr-logo.png" alt="Monero" className="about-xmr-icon" />
         <h1 className="about-title">
-          <span style={{ color: '#ff6600' }}>XMR</span>mempool.space
+          <span className="brand-xmr">XMR</span><span className="brand-lens">Lens</span>
         </h1>
-        <p className="about-tagline">A real-time Monero mempool &amp; blockchain explorer</p>
+        <p className="about-tagline">A real-time Monero txpool &amp; blockchain explorer</p>
       </div>
 
       {/* Description */}
       <div className="about-card">
         <h2 className="about-section-title">What is this?</h2>
         <p className="about-body">
-          XMRmempool.space is an open-source, self-hosted blockchain explorer for the Monero network —
+          XMRLens is an open-source, self-hosted blockchain explorer for the Monero network —
           inspired by <a href="https://mempool.space" target="_blank" rel="noopener noreferrer">mempool.space</a>.
-          It connects directly to a local Monero full node and shows live mempool activity,
+          It connects directly to a local Monero full node and shows live txpool activity,
           pending transaction blocks, fee estimates, network hashrate, and recent confirmed blocks.
         </p>
         <p className="about-body" style={{ marginTop: '10px' }}>
           Monero is a privacy-focused cryptocurrency where transaction amounts, senders, and
           recipients are all cryptographically hidden. Unlike Bitcoin, there are no addresses or
           amounts visible on-chain. This explorer reflects that by showing what
-          <em> is</em> public: block structure, fees, timing, and mempool pressure.
+          <em> is</em> public: block structure, fees, timing, and txpool pressure.
         </p>
       </div>
 

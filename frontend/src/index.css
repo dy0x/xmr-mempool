@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════════
-   XMR Mempool — Global Styles
+   XMRLens — Global Styles
    Visually inspired by mempool.space; Monero orange as accent colour.
    ════════════════════════════════════════════════════════════════════════════ */
 
@@ -14,13 +14,7 @@
 }
 
 :root {
-  --bg: #1d1f2e;
-  --bg-card: #252740;
-  --bg-card-dark: #1a1c2b;
-  --border: #2e3050;
-  --text: #d4d4d4;
-  --text-dim: #7a7d9a;
-  --text-bright: #f0f0f0;
+  /* Common variables across all themes */
   --xmr-orange: #ff6600;
   --xmr-orange2: #e05500;
   --green: #3bd16f;
@@ -30,6 +24,61 @@
   --radius: 8px;
   --radius-sm: 4px;
   --transition: 200ms ease;
+
+  /* Fallback / Default XMR Theme */
+  --bg: #000000;
+  --bg-card: #121212;
+  --bg-card-dark: #0a0a0a;
+  --navbar-bg: #000000;
+  --block-face: #080808;
+  --block-text: #ffffff;
+  --block-text-dim: rgba(255, 255, 255, 0.7);
+  --border: #222222;
+  --text: #f0f0f0;
+  --text-dim: #888888;
+  --text-bright: #ffffff;
+}
+
+[data-theme="XMR"] {
+  --bg: #000000;
+  --bg-card: #121212;
+  --bg-card-dark: #0a0a0a;
+  --navbar-bg: #000000;
+  --block-face: #080808;
+  --block-text: #ffffff;
+  --block-text-dim: rgba(255, 255, 255, 0.7);
+  --border: #222222;
+  --text: #f0f0f0;
+  --text-dim: #888888;
+  --text-bright: #ffffff;
+}
+
+[data-theme="dusk"] {
+  --bg: #1d1f2e;
+  --bg-card: #252740;
+  --bg-card-dark: #1a1c2b;
+  --navbar-bg: #13141f;
+  --block-face: #0e0f1a;
+  --block-text: #ffffff;
+  --block-text-dim: rgba(255, 255, 255, 0.7);
+  --border: #2e3050;
+  --text: #d4d4d4;
+  --text-dim: #7a7d9a;
+  --text-bright: #f0f0f0;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-card: #f8f8f8;
+  --bg-card-dark: #f0f0f0;
+  --navbar-bg: #ffffff;
+  --block-face: #ffffff;
+  --block-text: #222222;
+  --block-text-dim: #666666;
+  --border: #e0e0e0;
+  --text: #222222;
+  --text-dim: #666666;
+  --text-bright: #000000;
 }
 
 html,
@@ -77,7 +126,7 @@ a:hover {
 /* ── Navbar ───────────────────────────────────────────────────────────────── */
 
 .navbar {
-  background: #13141f;
+  background: var(--navbar-bg);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -97,9 +146,16 @@ a:hover {
 .navbar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   text-decoration: none;
   flex-shrink: 0;
+}
+
+.navbar-logo-img {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: block;
 }
 
 .brand-text {
@@ -112,12 +168,8 @@ a:hover {
   color: var(--xmr-orange);
 }
 
-.brand-mempool {
+.brand-lens {
   color: var(--text-bright);
-}
-
-.brand-space {
-  color: var(--text-dim);
 }
 
 .network-pill {
@@ -365,21 +417,32 @@ a:hover {
 /* ── Blockchain scroll view ───────────────────────────────────────────────── */
 
 .blockchain-section {
-  margin-bottom: 28px;
-  padding: 20px 0 28px;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  margin-right: calc(-50vw + 50%);
+  margin-bottom: 0px;
+  padding: 0px 0 0px;
 }
 
 /* Outer: the visible scrollable window */
 .blockchain-scroll-outer {
   overflow-x: auto;
   overflow-y: visible;
-  /* Always show a faint scrollbar so user knows it scrolls */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 102, 0, 0.3) transparent;
   padding: 16px 0;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Smooth momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+  /* Hide scrollbar */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.blockchain-scroll-outer::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari and Opera */
+}
+
+.blockchain-scroll-outer.is-dragging {
+  cursor: grabbing;
 }
 
 .blockchain-scroll-outer::-webkit-scrollbar {
@@ -395,11 +458,13 @@ a:hover {
 .blockchain-scroll-inner {
   display: flex;
   align-items: flex-end;
-  /* align to bottom so 3D shadow falls correctly */
   gap: 0;
   width: max-content;
-  /* Extra padding so edge blocks' shadows aren't clipped */
-  padding: 20px 16px 28px;
+  padding-left: 0;
+  padding-right: 50vw;
+  /* Large right padding to allow scrolling deep into history */
+  padding-top: 20px;
+  padding-bottom: 28px;
 }
 
 /* Block rows */
@@ -478,15 +543,46 @@ a:hover {
 }
 
 @keyframes xblockIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* New confirmed block slides in from left (from behind the arrow) */
+@keyframes confirmSlideIn {
+  from { opacity: 0; transform: translateX(-152px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.xblock-confirmed {
+  /* Suppress the generic drop animation for confirmed blocks — handled by confirmSlideIn on new arrivals */
+  animation: xblockIn 0.25s ease forwards;
+}
+
+.xblock-confirmed.xblock-slide-in {
+  animation: confirmSlideIn 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Skeleton loading block (infinite scroll) */
+.xblock-skeleton {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.xblock-skeleton .xblock-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.xblock-skeleton .xblock-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 102, 0, 0.15) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: xblock-shimmer 1.4s ease infinite;
+}
+@keyframes xblock-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
 }
 
 /* No 3D side elements needed */
@@ -542,12 +638,13 @@ a:hover {
   letter-spacing: 0.3px;
   text-transform: uppercase;
   z-index: 3;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.35);
+  border-top: 1px solid rgba(128, 128, 128, 0.1);
+  background: var(--bg-card-dark);
+  opacity: 0.8;
 }
 
 .xblock-label-pending {
-  color: var(--text-dim);
+  color: var(--block-text-dim);
 }
 
 .xblock-label-confirmed {
@@ -566,32 +663,31 @@ a:hover {
   font-size: 14px;
   font-weight: 700;
   font-family: var(--font-mono);
+  color: var(--block-text);
 }
 
-.xblock-txcount,
-.xblock-size,
-.xblock-time {
-  font-size: 11px;
-  color: var(--text-dim);
+.xblock-height.is-latest {
+  color: var(--xmr-orange);
 }
+
 
 .xblock-empty-label {
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--block-text-dim);
   font-style: italic;
 }
 
 /* Darker face so gradient colours pop against it */
 .xblock-face {
-  background: #0e0f1a;
+  background: var(--block-face);
 }
 
-/* Typography — always bright white inside blocks */
+/* Typography — use dynamic variables for themes */
 .xblock-txcount,
 .xblock-size,
 .xblock-time {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7) !important;
+  color: var(--block-text-dim);
 }
 
 /* Pending: dimmed */
@@ -618,6 +714,29 @@ a:hover {
 .xblock:hover .xblock-face {
   border-color: rgba(255, 102, 0, 0.35);
 }
+
+/* Miner tag shown as overlay inside confirmed blocks */
+.xblock-miner-tag-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 102, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 8px rgba(255, 102, 0, 0.4);
+}
+
+.xblock-miner-tag-overlay svg {
+  margin-right: 0 !important;
+  /* Center the icon */
+}
+
 
 /* Legacy */
 .empty-mempool {
@@ -650,6 +769,21 @@ a:hover {
 
 @media (max-width: 768px) {
   .bottom-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Fee chart + live tx feed side by side */
+.chart-tx-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .chart-tx-row {
     grid-template-columns: 1fr;
   }
 }
@@ -826,15 +960,16 @@ a:hover {
 
 /* ── Fee rate chart ───────────────────────────────────────────────────────── */
 
-.chart-section {
-  margin-bottom: 24px;
-}
+/* .chart-section removed — replaced by .chart-tx-row */
 
 .fee-chart-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .fee-chart-header {
@@ -907,7 +1042,8 @@ a:hover {
 
 .fee-chart-body {
   padding: 12px 16px 8px;
-  height: 180px;
+  flex: 1;
+  min-height: 160px;
   position: relative;
 }
 
@@ -968,6 +1104,11 @@ a:hover {
   color: var(--text-bright);
 }
 
+.chart-tooltip-conversion {
+  opacity: 0.75;
+  font-size: 10px;
+}
+
 .chart-tooltip-pool {
   margin-top: 5px;
   padding-top: 5px;
@@ -977,6 +1118,93 @@ a:hover {
 }
 
 /* ── Blocks list ──────────────────────────────────────────────────────────── */
+
+/* ── Mempool transaction list ─────────────────────────────────────────────── */
+
+.mempool-tx-list {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.mempool-tx-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Match the fee chart title style exactly */
+.mempool-tx-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.mempool-tx-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.mempool-tx-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Column widths: TxID wide, rest share remaining space */
+.mempool-tx-table th:nth-child(1),
+.mempool-tx-table td:nth-child(1) { width: 42%; }
+.mempool-tx-table th:nth-child(2),
+.mempool-tx-table td:nth-child(2) { width: 22%; }
+.mempool-tx-table th:nth-child(3),
+.mempool-tx-table td:nth-child(3) { width: 16%; }
+.mempool-tx-table th:nth-child(4),
+.mempool-tx-table td:nth-child(4) { width: 20%; }
+
+.tx-id-cell {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tx-id-link {
+  color: var(--xmr-orange);
+  text-decoration: none;
+}
+
+.tx-id-link:hover {
+  text-decoration: underline;
+}
+
+.tx-confirmed-badge {
+  margin-left: 6px;
+  font-size: 10px;
+  color: #3bd16f;
+  opacity: 0.8;
+}
+
+/* Placeholder rows — same height as real rows, no content */
+.tx-placeholder-row td {
+  border-bottom: 1px solid var(--border);
+}
+
+.tx-placeholder-row:last-child td {
+  border-bottom: none;
+}
+
+/* New-entry slide-in animation */
+.mempool-tx-row.is-new td {
+  animation: txSlideIn 0.45s ease forwards;
+}
+
+@keyframes txSlideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 .blocks-section {
   margin-top: 8px;
@@ -1079,6 +1307,67 @@ a:hover {
 .hash-link:hover {
   color: var(--xmr-orange);
 }
+
+/* Orphaned blocks */
+.orphan-row td {
+  opacity: 0.45;
+  background: rgba(232, 65, 66, 0.04);
+}
+
+.orphan-row:hover td {
+  opacity: 0.6;
+  background: rgba(232, 65, 66, 0.08);
+}
+
+.block-height-orphan {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--red, #e84142);
+  cursor: default;
+}
+
+.orphan-hash {
+  color: var(--red, #e84142);
+  opacity: 0.6;
+}
+
+/* Miner badges */
+.miner-cell {
+  white-space: nowrap;
+}
+
+.miner-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.p2pool-badge {
+  background: rgba(255, 102, 0, 0.15);
+  color: var(--xmr-orange);
+  border: 1px solid rgba(255, 102, 0, 0.3);
+  gap: 2px;
+}
+
+.p2pool-badge:hover {
+  background: rgba(255, 102, 0, 0.25);
+}
+
+.orphan-badge {
+  background: rgba(232, 65, 66, 0.12);
+  color: #e84142;
+  border: 1px solid rgba(232, 65, 66, 0.25);
+}
+
+.unknown-badge {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
 
 /* ── Detail pages ─────────────────────────────────────────────────────────── */
 
@@ -1267,6 +1556,109 @@ a:hover {
   color: var(--text);
 }
 
+.ring-item-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.ring-field-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ring-item-field .mono {
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.ring-members {
+  margin-top: 8px;
+}
+
+.ring-members-header {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.ring-members-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.ring-members-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 500;
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ring-members-table td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  vertical-align: top;
+}
+
+.ring-key-cell {
+  word-break: break-all;
+  color: var(--text-dim);
+  max-width: 300px;
+}
+
+.tx-io-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tx-io-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: var(--bg-card-dark);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.tx-io-index {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.tx-io-key {
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.tx-extra-field {
+  font-size: 11px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 0 0 6px;
+  text-decoration: underline;
+}
+
 .more-hint {
   font-size: 11px;
   color: var(--text-dim);
@@ -1328,10 +1720,12 @@ a:hover {
 }
 
 .about-xmr-icon {
-  font-size: 48px;
-  color: var(--xmr-orange);
-  line-height: 1;
+  width: 72px;
+  height: 72px;
   margin-bottom: 12px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .about-title {
@@ -1533,26 +1927,7 @@ a:hover {
   margin-right: 2px;
 }
 
-/* ── Currency Bar (sticky footer) ────────────────────────────────────────── */
-
-.currency-bar {
-  margin-top: auto;
-  height: 44px;
-  background: #10111c;
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-}
-
-.currency-bar-inner {
-  max-width: 1400px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+/* ── Combined Footer (sticky) ────────────────────────────────────────────── */
 
 .currency-price-block {
   display: flex;
@@ -1746,8 +2121,7 @@ a:hover {
 /* ── App Footer ───────────────────────────────────────────────────────────── */
 
 .app-footer {
-  text-align: center;
-  padding: 10px 24px;
+  padding: 12px 24px;
   font-size: 11px;
   color: var(--text-dim);
   border-top: 1px solid var(--border);
@@ -1756,13 +2130,98 @@ a:hover {
 }
 
 .footer-content {
+  max-width: 1400px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 20px;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.footer-node-version {
+  color: var(--text-dim);
+}
+
+.theme-switcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-select {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 4px 28px 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all var(--transition);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath stroke='%237a7d9a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.theme-select:hover {
+  border-color: var(--xmr-orange);
+  color: var(--text-bright);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath stroke='%23ff6600' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
 }
 
 .app-footer .mono {
   font-family: var(--font-mono);
   color: var(--text-bright);
+}
+
+/* ── XMR Amount hover tooltip ─────────────────────────────────────────────── */
+
+.xmr-amount {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+  border-bottom: 1px dashed var(--text-dim);
+  white-space: nowrap;
+}
+
+.xmr-amount-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-tooltip, #1a1a2e);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  z-index: 200;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+
+/* arrow */
+.xmr-amount-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--border);
+}
+
+.xmr-amount:hover .xmr-amount-tip {
+  display: block;
 }

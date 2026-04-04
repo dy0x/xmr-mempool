@@ -1,5 +1,5 @@
 /**
- * Mempool Manager
+ * XMRLens — Mempool Manager
  * Polls the Monero node for mempool + block data and projects
  * "mempool blocks" the same way mempool.space does for Bitcoin.
  *
@@ -20,7 +20,8 @@ import path from 'path';
  *  In practice blocks are ~300 KB, we cap a "mempool block" at this size. */
 const MEMPOOL_BLOCK_WEIGHT_CAP = 300_000;
 const POLL_INTERVAL_MS        = 8_000;
-const INITIAL_BLOCKS_COUNT    = 40;
+const INITIAL_BLOCKS_COUNT    = 60;              // Match fee history window
+const INITIAL_FEE_BLOCKS      = 60;              // ~2 h of history to fill chart
 const FEE_HISTORY_MAX_POINTS  = 10_800;          // ~24 h at 8 s/poll
 const FEE_HISTORY_FILE        = path.join(        // persisted next to the source
   __dirname, '..', 'data', 'fee-history.jsonl'
@@ -49,6 +50,12 @@ export interface RecentBlock {
   reward: number;     // piconero
   medianFee?: number; // piconero / byte (estimated from block weight / fee)
   minorVersion: number;
+  isOrphan: boolean;
+  /**
+   * Extensible miner tag. Currently populated for P2Pool blocks.
+   * Future: add more pools by extending the polling logic below.
+   */
+  miner?: 'p2pool' | string;
 }
 
 export interface MempoolInfo {
@@ -171,7 +178,7 @@ function summariseBlock(index: number, txs: PoolTransaction[]): MempoolBlock {
   };
 }
 
-function blockHeaderToRecentBlock(header: BlockHeader): RecentBlock {
+export function blockHeaderToRecentBlock(header: BlockHeader): RecentBlock {
   return {
     height: header.height,
     hash: header.hash,
@@ -182,7 +189,105 @@ function blockHeaderToRecentBlock(header: BlockHeader): RecentBlock {
     difficulty: header.difficulty,
     reward: header.reward,
     minorVersion: header.minor_version,
+    isOrphan: header.orphan_status ?? false,
   };
+}
+
+// ── Miner detection ────────────────────────────────────────────────────
+//
+// To add a new pool in future:
+//  1. Add a new polling function (see pollP2Pool below as a template).
+//  2. Call it in startMinerPolling() below, adding results to minerCache.
+//  3. The block enrichment loop in refreshBlocks() picks it up automatically.
+
+/** Block-hash → miner tag, shared across all pools. */
+export const minerCache = new Map<string, string>();
+/** Block-hash → calculated median fee rate. */
+const blockFeeCache = new Map<string, number>();
+
+async function calculateBlockMinFee(hash: string): Promise<number> {
+  if (blockFeeCache.has(hash)) return blockFeeCache.get(hash)!;
+
+  try {
+    const block = await moneroRPC.getBlock(undefined, hash);
+    if (!block.tx_hashes || block.tx_hashes.length === 0) return 0;
+
+    // Fetch all transaction details to get fees and weights
+    const res = await moneroRPC.getTransactions(block.tx_hashes, true);
+    if (!res.txs || res.txs.length === 0) return 0;
+
+    interface TxJson { rct_signatures?: { txnFee?: number } }
+    const rates = res.txs.map(tx => {
+      let fee = 0;
+      let weight = 0;
+      // Fee lives in rct_signatures.txnFee for RCT (v2+) transactions
+      if (tx.as_json) {
+        try {
+          const parsed = JSON.parse(tx.as_json) as TxJson;
+          fee = parsed.rct_signatures?.txnFee ?? 0;
+        } catch { }
+      }
+      // Weight = blob byte length (as_hex is hex-encoded, 2 chars per byte)
+      if (tx.as_hex) weight = tx.as_hex.length / 2;
+      return weight > 0 && fee > 0 ? fee / weight : 0;
+    }).filter(r => r > 0).sort((a, b) => a - b);
+
+    if (rates.length === 0) return 0;
+    // Use the minimum (rates is sorted ascending) — this is the cheapest fee
+    // that actually got confirmed, immune to high-fee outliers.
+    const minRate = rates[0];
+    blockFeeCache.set(hash, Math.round(minRate));
+    return Math.round(minRate);
+  } catch (err) {
+    console.error(`[mempool] failed to calculate min fee for block ${hash}:`, err);
+    return 0;
+  }
+}
+
+/** Fetch the N most recently found Monero blocks from P2Pool APIs. */
+async function pollP2Pool(): Promise<void> {
+  const endpoints = [
+    'https://p2pool.io/api/found_blocks?limit=100',
+    'https://p2pool.observer/api/found_blocks?limit=100'
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!resp.ok) continue;
+      
+      const blocks = await resp.json() as Array<{ main_block: { id: string } }>;
+      if (!Array.isArray(blocks)) continue;
+
+      for (const b of blocks) {
+        if (b?.main_block?.id) {
+          minerCache.set(b.main_block.id, 'p2pool');
+        }
+      }
+      
+      // Bound cache size: keep the 1000 most-recently-inserted entries
+      if (minerCache.size > 1000) {
+        const keys = Array.from(minerCache.keys());
+        const toDelete = keys.slice(0, minerCache.size - 1000);
+        for (const k of toDelete) minerCache.delete(k);
+      }
+      
+      return; // Success, don't try fallback
+    } catch (err) {
+      // Silently try next endpoint
+    }
+  }
+}
+
+/** Start polling all supported miner APIs. Call once on startup. */
+let minerPollingStarted = false;
+function startMinerPolling() {
+  if (minerPollingStarted) return;
+  minerPollingStarted = true;
+  // Initial fetch
+  void pollP2Pool();
+  // Refresh every 2 minutes (well within any rate limit)
+  setInterval(() => void pollP2Pool(), 2 * 60 * 1000);
 }
 
 function infoToNetworkStats(info: MoneroInfo, lastHeader?: BlockHeader): NetworkStats {
@@ -404,17 +509,76 @@ class MempoolManager {
       const knownTip = recentBlocks[0]?.height ?? -1;
       const needsBlockRefresh = newTip && newTip.height > knownTip;
 
-      if (needsBlockRefresh || recentBlocks.length === 0) {
+      // Detect reorg: if the new tip's prev_hash doesn't match our known block at that height-1,
+      // the chain has reorganised and we must refetch the full range.
+      const knownPrevHash = recentBlocks.find(b => b.height === (newTip?.height ?? 0) - 1)?.hash;
+      const reorg = newTip && knownPrevHash && knownPrevHash !== newTip.prev_hash;
+      if (reorg) {
+        console.warn(`[mempool] Reorg detected at height ${newTip!.height}! Refetching block history.`);
+      }
+
+      if (needsBlockRefresh || recentBlocks.length === 0 || reorg) {
         const tipHeight = newTip ? newTip.height : info.height - 1;
         const startHeight = Math.max(0, tipHeight - INITIAL_BLOCKS_COUNT + 1);
         try {
           const rangeResult = await moneroRPC.getBlockHeadersRange(startHeight, tipHeight);
-          recentBlocks = rangeResult.headers
+          const base = rangeResult.headers
             .map(blockHeaderToRecentBlock)
             .reverse(); // newest first
+
+          // Enrich with miner tags from the shared minerCache.
+          // Already-classified blocks are carried forward from previous state.
+          const prevMiner = new Map(recentBlocks.map(b => [b.hash, b.miner]));
+          for (const b of base) {
+            b.miner = minerCache.get(b.hash) ?? prevMiner.get(b.hash);
+          }
+
+          recentBlocks = base;
+
+          // Enrich all recent blocks not already in fee history
+          const enrichedTimestamps = new Set(this.feeHistory.map(s => s.ts));
+          const toEnrich = recentBlocks
+            .slice(0, INITIAL_FEE_BLOCKS)
+            .filter(b => !enrichedTimestamps.has(b.timestamp * 1000));
+
+          if (toEnrich.length > 0) {
+            if (this.feeHistory.length === 0) {
+              console.log(`[mempool] performing initial enrichment of ${toEnrich.length} blocks...`);
+            }
+
+            const CHUNK_SIZE = 10;
+            const newSnaps: FeeSnapshot[] = [];
+
+            for (let i = 0; i < toEnrich.length; i += CHUNK_SIZE) {
+              const chunk = toEnrich.slice(i, i + CHUNK_SIZE);
+              await Promise.all(chunk.map(async (block) => {
+                if (!block) return;
+                const med = await calculateBlockMinFee(block.hash);
+                block.medianFee = med;
+                newSnaps.push({
+                  ts: block.timestamp * 1000,
+                  slowFee: Math.round(med * 0.8),
+                  normalFee: med,
+                  fastFee: Math.round(med * 1.5),
+                  txPoolSize: info.tx_pool_size,
+                });
+              }));
+            }
+
+            for (const snap of newSnaps) {
+              if (!enrichedTimestamps.has(snap.ts)) {
+                this.feeHistory.push(snap);
+                this.persistSnapshot(snap);
+              }
+            }
+            this.feeHistory.sort((a, b) => a.ts - b.ts);
+            while (this.feeHistory.length > FEE_HISTORY_MAX_POINTS) {
+              this.feeHistory.shift();
+            }
+            console.log(`[mempool] enrichment complete: ${this.feeHistory.length} snapshots total.`);
+          }
         } catch (err) {
           console.error('[mempool] failed to fetch block headers range:', err);
-          // Fallback: just use the last header we have
           if (newTip) {
             recentBlocks = [blockHeaderToRecentBlock(newTip), ...recentBlocks].slice(0, INITIAL_BLOCKS_COUNT);
           }
@@ -433,23 +597,10 @@ class MempoolManager {
         lastUpdated: Date.now(),
       };
 
-      // Record fee history snapshot every poll
-      const snap: FeeSnapshot = {
-        ts: Date.now(),
-        slowFee:   fees.slowFee,
-        normalFee: fees.normalFee,
-        fastFee:   fees.fastFee,
-        txPoolSize: info.tx_pool_size,
-      };
-      this.feeHistory.push(snap);
-      this.persistSnapshot(snap);
-      if (this.feeHistory.length > FEE_HISTORY_MAX_POINTS) {
-        this.feeHistory.shift();
-      }
-
       // Only notify subscribers if something meaningful changed
       const txPoolChanged = info.tx_pool_size !== this.previousTxPoolSize;
       const blockChanged = needsBlockRefresh;
+      
       if (txPoolChanged || blockChanged) {
         this.previousTxPoolSize = info.tx_pool_size;
         this.notify();
@@ -467,4 +618,8 @@ class MempoolManager {
 }
 
 export const mempoolManager = new MempoolManager();
+
+// Start polling miner identification APIs on process boot
+startMinerPolling();
+
 export default MempoolManager;
