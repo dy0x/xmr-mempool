@@ -88,6 +88,63 @@ router.get('/mempool/recent', async (_req: Request, res: Response) => {
   }
 });
 
+/**
+ * Most recent 7 transactions — unconfirmed first, padded with confirmed if pool is thin.
+ * Used by the live tx feed on the dashboard.
+ */
+router.get('/transactions/recent', async (_req: Request, res: Response) => {
+  try {
+    const LIMIT = 7;
+
+    // 1. Unconfirmed pool
+    const pool = await moneroRPC.getTransactionPool();
+    const poolTxs = (pool.transactions ?? [])
+      .sort((a, b) => b.receive_time - a.receive_time)
+      .slice(0, LIMIT)
+      .map(tx => ({
+        txid:      tx.id_hash,
+        fee:       tx.fee,
+        size:      tx.weight > 0 ? tx.weight : tx.blob_size,
+        timestamp: tx.receive_time,
+        confirmed: false,
+      }));
+
+    if (poolTxs.length >= LIMIT) return ok(res, poolTxs);
+
+    // 2. Top up from the latest confirmed block
+    const needed = LIMIT - poolTxs.length;
+    const state  = mempoolManager.getState();
+    const tip    = state?.recentBlocks[0];
+    if (!tip) return ok(res, poolTxs);
+
+    const block    = await moneroRPC.getBlock(tip.height);
+    const hashes   = (block.tx_hashes ?? [])
+      .filter((h: string) => h !== block.miner_tx_hash)
+      .slice(0, needed);
+
+    if (hashes.length === 0) return ok(res, poolTxs);
+
+    const result = await moneroRPC.getTransactions(hashes, true);
+    const confirmedTxs = (result.txs ?? []).map(tx => {
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(tx.as_json) as Record<string, unknown>; } catch { /* ignore */ }
+      const fee  = (parsed.rct_signatures as { txnFee?: number } | undefined)?.txnFee ?? 0;
+      const size = Math.round((tx.as_hex?.length ?? 0) / 2);
+      return {
+        txid:      tx.tx_hash,
+        fee,
+        size,
+        timestamp: tx.block_timestamp,
+        confirmed: true,
+      };
+    });
+
+    return ok(res, [...poolTxs, ...confirmedTxs]);
+  } catch (err) {
+    return serverError(res, err);
+  }
+});
+
 router.get('/fees/recommended', (_req: Request, res: Response) => {
   const state = mempoolManager.getState();
   if (!state) return notFound(res, 'Node not yet synced');

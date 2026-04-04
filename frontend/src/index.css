@@ -419,9 +419,6 @@ a:hover {
 .blockchain-section {
   margin-bottom: 0px;
   padding: 0px 0 0px;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  margin-right: calc(-50vw + 50%);
 }
 
 /* Outer: the visible scrollable window */
@@ -463,8 +460,7 @@ a:hover {
   align-items: flex-end;
   gap: 0;
   width: max-content;
-  /* Align left padding with .main-content (max-width 1400, padding 16px) */
-  padding-left: calc(max(16px, (100vw - 1400px) / 2 + 16px));
+  padding-left: 0;
   padding-right: 50vw;
   /* Large right padding to allow scrolling deep into history */
   padding-top: 20px;
@@ -777,6 +773,21 @@ a:hover {
   }
 }
 
+/* Fee chart + live tx feed side by side */
+.chart-tx-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .chart-tx-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Fees box ─────────────────────────────────────────────────────────────── */
 
 .fees-box {
@@ -949,15 +960,16 @@ a:hover {
 
 /* ── Fee rate chart ───────────────────────────────────────────────────────── */
 
-.chart-section {
-  margin-bottom: 24px;
-}
+/* .chart-section removed — replaced by .chart-tx-row */
 
 .fee-chart-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .fee-chart-header {
@@ -1030,7 +1042,8 @@ a:hover {
 
 .fee-chart-body {
   padding: 12px 16px 8px;
-  height: 180px;
+  flex: 1;
+  min-height: 160px;
   position: relative;
 }
 
@@ -1105,6 +1118,93 @@ a:hover {
 }
 
 /* ── Blocks list ──────────────────────────────────────────────────────────── */
+
+/* ── Mempool transaction list ─────────────────────────────────────────────── */
+
+.mempool-tx-list {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.mempool-tx-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Match the fee chart title style exactly */
+.mempool-tx-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.mempool-tx-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.mempool-tx-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Column widths: TxID wide, rest share remaining space */
+.mempool-tx-table th:nth-child(1),
+.mempool-tx-table td:nth-child(1) { width: 42%; }
+.mempool-tx-table th:nth-child(2),
+.mempool-tx-table td:nth-child(2) { width: 22%; }
+.mempool-tx-table th:nth-child(3),
+.mempool-tx-table td:nth-child(3) { width: 16%; }
+.mempool-tx-table th:nth-child(4),
+.mempool-tx-table td:nth-child(4) { width: 20%; }
+
+.tx-id-cell {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tx-id-link {
+  color: var(--xmr-orange);
+  text-decoration: none;
+}
+
+.tx-id-link:hover {
+  text-decoration: underline;
+}
+
+.tx-confirmed-badge {
+  margin-left: 6px;
+  font-size: 10px;
+  color: #3bd16f;
+  opacity: 0.8;
+}
+
+/* Placeholder rows — same height as real rows, no content */
+.tx-placeholder-row td {
+  border-bottom: 1px solid var(--border);
+}
+
+.tx-placeholder-row:last-child td {
+  border-bottom: none;
+}
+
+/* New-entry slide-in animation */
+.mempool-tx-row.is-new td {
+  animation: txSlideIn 0.45s ease forwards;
+}
+
+@keyframes txSlideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 .blocks-section {
   margin-top: 8px;

@@ -5,7 +5,7 @@
  * similar to mempool.space. Shows the last 2 hours of data.
  */
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface FeeSnapshot {
   ts: number;
@@ -39,8 +39,28 @@ export default function FeeChart({ xmrPrice, selectedCurrency }: FeeChartProps) 
   const [data, setData] = useState<FeeSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; snap: FeeSnapshot } | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null) as React.RefObject<SVGSVGElement>;
+  const [containerSize, setContainerSize] = useState({ width: 900, height: 160 });
+  const bodyRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Observe the body div directly — this is the stable element that always exists,
+  // so the observer never loses track when ChartSVG conditionally mounts/unmounts.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) setContainerSize({ width, height });
+      }
+    });
+    observer.observe(el);
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setContainerSize({ width: rect.width, height: rect.height });
+    }
+    return () => observer.disconnect();
+  }, []);
 
   const fetchData = useCallback(() => {
     fetch(`/api/v1/statistics/fees?window=2h`)
@@ -70,7 +90,7 @@ export default function FeeChart({ xmrPrice, selectedCurrency }: FeeChartProps) 
         </div>
       </div>
 
-      <div className="fee-chart-body">
+      <div className="fee-chart-body" ref={bodyRef}>
         {loading ? (
           <div className="fee-chart-loading">Loading fee history…</div>
         ) : data.length < 2 ? (
@@ -80,7 +100,8 @@ export default function FeeChart({ xmrPrice, selectedCurrency }: FeeChartProps) 
         ) : (
           <ChartSVG
             data={data}
-            svgRef={svgRef}
+            width={containerSize.width}
+            height={containerSize.height}
             tooltip={tooltip}
             onTooltip={setTooltip}
             xmrPrice={xmrPrice}
@@ -96,7 +117,8 @@ export default function FeeChart({ xmrPrice, selectedCurrency }: FeeChartProps) 
 
 interface ChartSVGProps {
   data: FeeSnapshot[];
-  svgRef: React.RefObject<SVGSVGElement>;
+  width: number;
+  height: number;
   tooltip: { x: number; y: number; snap: FeeSnapshot } | null;
   onTooltip: (t: { x: number; y: number; snap: FeeSnapshot } | null) => void;
   xmrPrice?: number;
@@ -106,26 +128,10 @@ interface ChartSVGProps {
 // Approximate size of a typical 2-in/2-out RingCT transaction (bytes)
 const TYPICAL_TX_BYTES = 1400;
 
-function ChartSVG({ data, svgRef, tooltip, onTooltip, xmrPrice, selectedCurrency }: ChartSVGProps) {
-  const [size, setSize] = useState({ width: 900, height: 160 });
+function ChartSVG({ data, width, height, tooltip, onTooltip, xmrPrice, selectedCurrency }: ChartSVGProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
 
-  useEffect(() => {
-    if (!svgRef.current || !svgRef.current.parentElement) return;
-    const parent = svgRef.current.parentElement;
-    const observer = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
-          setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
-        }
-      }
-    });
-    observer.observe(parent);
-    const rect = parent.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) setSize({ width: rect.width, height: rect.height });
-    return () => observer.disconnect();
-  }, [svgRef]);
-
-  const W = size.width, H = size.height;
+  const W = width, H = height;
   const PAD = { top: 10, right: 32, bottom: 28, left: 52 };
   const cW = W - PAD.left - PAD.right;
   const cH = H - PAD.top - PAD.bottom;

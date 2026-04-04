@@ -2,10 +2,11 @@ import type { AppState } from '../types';
 import StatsBar from './StatsBar';
 import MempoolBlocks from './MempoolBlocks';
 import FeesBox from './FeesBox';
-import BlocksList from './BlocksList';
+import MempoolTxList from './MempoolTxList';
 import FeeChart from './FeeChart';
 
-import type { RecentBlock } from '../types';
+import type { RecentBlock, MempoolInfo, NetworkStats } from '../types';
+import { formatBytes, piconeroToXMR, formatFeeRate } from '../types';
 
 interface Props {
   state: AppState;
@@ -46,29 +47,22 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
         <MempoolBlocks mempoolBlocks={mempoolBlocks} recentBlocks={recentBlocks} onAppendBlocks={onAppendBlocks} />
       </section>
 
-      {/* Bottom row: fee box + info */}
+      {/* Fee estimates + mempool stats */}
       <section className="bottom-row">
         <FeesBox fees={fees} selectedCurrency={selectedCurrency} xmrPrice={xmrPrice} mempoolBlocks={mempoolBlocks} />
         <MempoolSummary mempoolInfo={mempoolInfo} networkStats={networkStats} />
       </section>
 
-      {/* Fee rate chart */}
-      <section className="chart-section">
+      {/* Fee chart + live tx feed side by side */}
+      <section className="chart-tx-row">
         <FeeChart xmrPrice={xmrPrice} selectedCurrency={selectedCurrency} />
-      </section>
-
-      {/* Block table */}
-      <section className="blocks-section">
-        <BlocksList recentBlocks={recentBlocks} />
+        <MempoolTxList />
       </section>
     </div>
   );
 }
 
 // ── Mempool summary card ──────────────────────────────────────────────────────
-
-import type { MempoolInfo, NetworkStats } from '../types';
-import { formatBytes, piconeroToXMR, formatFeeRate } from '../types';
 
 function MempoolSummary({
   mempoolInfo,
