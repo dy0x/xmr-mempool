@@ -66,7 +66,6 @@ export default function BlockDetail() {
         <DetailRow label="Timestamp" value={`${new Date(block.timestamp * 1000).toUTCString()} (${timeAgo(block.timestamp)})`} />
         <DetailRow label="Transactions" value={block.nTx.toLocaleString()} />
         <DetailRow label="Size" value={formatBytes(block.size)} />
-        <DetailRow label="Weight" value={formatBytes(block.weight)} />
         <DetailRow label="Difficulty" value={block.difficulty.toLocaleString()} />
         <DetailRow label="Block reward" value={<XMRAmount piconero={block.reward} decimals={6} />} />
         <DetailRow label="Nonce" value={block.nonce.toLocaleString()} />

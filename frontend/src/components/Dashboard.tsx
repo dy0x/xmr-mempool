@@ -5,15 +5,18 @@ import FeesBox from './FeesBox';
 import BlocksList from './BlocksList';
 import FeeChart from './FeeChart';
 
+import type { RecentBlock } from '../types';
+
 interface Props {
   state: AppState;
   selectedCurrency?: string;
   xmrPrice?: number;
   priceChange24h?: number | null;
   priceFetchedAt?: number;
+  onAppendBlocks: (blocks: RecentBlock[]) => void;
 }
 
-export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChange24h, priceFetchedAt }: Props) {
+export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChange24h, priceFetchedAt, onAppendBlocks }: Props) {
   const { mempoolBlocks, recentBlocks, mempoolInfo, fees, networkStats, loading } = state;
 
   if (loading) {
@@ -40,7 +43,7 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
 
       {/* Main visualisation: mempool ←→ blockchain */}
       <section className="blockchain-section">
-        <MempoolBlocks mempoolBlocks={mempoolBlocks} recentBlocks={recentBlocks} />
+        <MempoolBlocks mempoolBlocks={mempoolBlocks} recentBlocks={recentBlocks} onAppendBlocks={onAppendBlocks} />
       </section>
 
       {/* Bottom row: fee box + info */}

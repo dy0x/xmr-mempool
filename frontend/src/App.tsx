@@ -30,16 +30,20 @@ type Action =
   | { type: 'INIT'; payload: InitPayload }
   | { type: 'MEMPOOL_BLOCKS'; payload: AppState['mempoolBlocks'] }
   | { type: 'STATS'; payload: StatsPayload }
-  | { type: 'BLOCKS'; payload: AppState['recentBlocks'] };
+  | { type: 'BLOCKS'; payload: AppState['recentBlocks'] }
+  | { type: 'APPEND_BLOCKS'; payload: AppState['recentBlocks'] };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'CONNECTED':
       return { ...state, connected: action.payload };
-    case 'INIT':
+    case 'INIT': {
+      const incoming = action.payload.blocks;
+      const incomingMinHeight = incoming[incoming.length - 1]?.height ?? 0;
+      const preserved = state.recentBlocks.filter(b => b.height < incomingMinHeight);
       return {
         ...state,
-        recentBlocks: action.payload.blocks,
+        recentBlocks: [...incoming, ...preserved],
         mempoolInfo: action.payload.mempoolInfo,
         mempoolBlocks: action.payload.mempoolBlocks,
         fees: action.payload.fees,
@@ -47,6 +51,7 @@ function reducer(state: AppState, action: Action): AppState {
         loading: false,
         lastUpdated: Date.now(),
       };
+    }
     case 'MEMPOOL_BLOCKS':
       return { ...state, mempoolBlocks: action.payload, lastUpdated: Date.now() };
     case 'STATS':
@@ -57,8 +62,19 @@ function reducer(state: AppState, action: Action): AppState {
         networkStats: action.payload.networkStats,
         lastUpdated: Date.now(),
       };
-    case 'BLOCKS':
-      return { ...state, recentBlocks: action.payload, lastUpdated: Date.now() };
+    case 'BLOCKS': {
+      const incoming = action.payload;
+      if (!incoming.length) return state;
+      const incomingMinHeight = incoming[incoming.length - 1].height;
+      const preserved = state.recentBlocks.filter(b => b.height < incomingMinHeight);
+      return { ...state, recentBlocks: [...incoming, ...preserved], lastUpdated: Date.now() };
+    }
+    case 'APPEND_BLOCKS': {
+      const loadedHeights = new Set(state.recentBlocks.map(b => b.height));
+      const newBlocks = action.payload.filter(b => !loadedHeights.has(b.height));
+      if (!newBlocks.length) return state;
+      return { ...state, recentBlocks: [...state.recentBlocks, ...newBlocks] };
+    }
     default:
       return state;
   }
@@ -144,6 +160,7 @@ export default function App() {
                   xmrPrice={xmrPrice}
                   priceChange24h={priceChange24h}
                   priceFetchedAt={priceFetchedAt}
+                  onAppendBlocks={(blocks) => dispatch({ type: 'APPEND_BLOCKS', payload: blocks })}
                 />
               }
             />

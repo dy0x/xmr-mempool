@@ -4,7 +4,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { mempoolManager } from './mempool-manager';
+import { mempoolManager, blockHeaderToRecentBlock, minerCache } from './mempool-manager';
 import { moneroRPC } from './monero-rpc';
 
 const router = Router();
@@ -166,6 +166,35 @@ router.get('/blocks', (_req: Request, res: Response) => {
   const countParam = typeof _req.query['count'] === 'string' ? _req.query['count'] : '15';
   const count = Math.min(parseInt(countParam, 10), 50);
   return ok(res, state.recentBlocks.slice(0, count));
+});
+
+/**
+ * Fetch up to 10 confirmed blocks below the given height.
+ * Used by the frontend's infinite-scroll block explorer.
+ * Pattern mirrors mempool.space GET /api/v1/blocks/:startHeight
+ */
+router.get('/blocks/:fromHeight', async (req: Request, res: Response) => {
+  try {
+    const fromHeight = parseInt(String(req.params['fromHeight'] ?? ''), 10);
+    if (isNaN(fromHeight) || fromHeight <= 0) return ok(res, []);
+
+    const endHeight   = fromHeight - 1;
+    const startHeight = Math.max(0, fromHeight - 10);
+
+    const result = await moneroRPC.getBlockHeadersRange(startHeight, endHeight);
+    const blocks = [...result.headers]
+      .reverse() // newest-first
+      .map(h => {
+        const b = blockHeaderToRecentBlock(h);
+        const tag = minerCache.get(b.hash);
+        if (tag) b.miner = tag;
+        return b;
+      });
+
+    return ok(res, blocks);
+  } catch (err) {
+    return serverError(res, err);
+  }
 });
 
 router.get('/block/tip/height', (_req: Request, res: Response) => {

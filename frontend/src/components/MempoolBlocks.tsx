@@ -8,7 +8,7 @@
  * that rises to represent how full the block is. Flat design, no 3D clipping.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MempoolBlock, RecentBlock } from '../types';
 import { feeRateColor, formatBytes, formatFeeRate, piconeroToXMR, timeAgo } from '../types';
@@ -16,20 +16,72 @@ import XMRAmount from './XMRAmount';
 
 
 interface Props {
-  mempoolBlocks: MempoolBlock[];
-  recentBlocks:  RecentBlock[];
+  mempoolBlocks:  MempoolBlock[];
+  recentBlocks:   RecentBlock[];
+  onAppendBlocks: (blocks: RecentBlock[]) => void;
 }
 
 const MAX_PENDING = 40;
-const MAX_RECENT  = 60;
 const BLOCK_CAP   = 300_000; // bytes — used for fill %
 
-export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
+export default function MempoolBlocks({ mempoolBlocks, recentBlocks, onAppendBlocks }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
 
   const pending = mempoolBlocks.slice(0, MAX_PENDING);
-  const recent  = recentBlocks.slice(0, MAX_RECENT);
+  const recent  = recentBlocks; // no cap — lazily loaded history lives here
+
+  // ── Infinite scroll ────────────────────────────────────────────────────────
+  const [isFetchingMore, setIsFetchingMore]   = useState(false);
+  const [reachedGenesis, setReachedGenesis]   = useState(false);
+  const fetchedBottomRef = useRef<number | null>(null);
+
+  const fetchMoreBlocks = useCallback(async () => {
+    if (isFetchingMore || reachedGenesis) return;
+    const oldest = recent[recent.length - 1];
+    if (!oldest || oldest.height === 0) { setReachedGenesis(true); return; }
+    // Guard against re-fetching the same range on rapid scroll
+    if (fetchedBottomRef.current !== null && fetchedBottomRef.current <= oldest.height) return;
+    fetchedBottomRef.current = oldest.height;
+    setIsFetchingMore(true);
+    try {
+      const resp = await fetch(`/api/v1/blocks/${oldest.height}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json() as RecentBlock[];
+      if (data.length > 0) {
+        onAppendBlocks(data);
+        if (data[data.length - 1].height === 0) setReachedGenesis(true);
+      } else {
+        setReachedGenesis(true);
+      }
+    } catch (err) {
+      console.error('[infinite-scroll] failed to fetch blocks:', err);
+      fetchedBottomRef.current = null; // allow retry on next scroll
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [isFetchingMore, reachedGenesis, recent, onAppendBlocks]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || isFetchingMore || reachedGenesis) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onScroll = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        const el = scrollRef.current;
+        if (!el) return;
+        const distFromRight = el.scrollWidth - el.scrollLeft - el.clientWidth;
+        if (distFromRight < 600) fetchMoreBlocks();
+      }, 150);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (timer) clearTimeout(timer);
+    };
+  }, [isFetchingMore, reachedGenesis, fetchMoreBlocks]);
 
   // Track newly confirmed blocks to trigger slide-in animation
   const [newBlockHeight, setNewBlockHeight] = useState<number | null>(null);
@@ -136,6 +188,11 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
               onClick={handleBlockClick}
             />
           ))}
+          {isFetchingMore && (
+            <div className="xblock xblock-confirmed xblock-skeleton" aria-hidden="true">
+              <div className="xblock-face" />
+            </div>
+          )}
         </div>
 
       </div>

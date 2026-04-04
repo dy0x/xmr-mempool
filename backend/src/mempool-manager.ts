@@ -178,7 +178,7 @@ function summariseBlock(index: number, txs: PoolTransaction[]): MempoolBlock {
   };
 }
 
-function blockHeaderToRecentBlock(header: BlockHeader): RecentBlock {
+export function blockHeaderToRecentBlock(header: BlockHeader): RecentBlock {
   return {
     height: header.height,
     hash: header.hash,
@@ -201,7 +201,7 @@ function blockHeaderToRecentBlock(header: BlockHeader): RecentBlock {
 //  3. The block enrichment loop in refreshBlocks() picks it up automatically.
 
 /** Block-hash → miner tag, shared across all pools. */
-const minerCache = new Map<string, string>();
+export const minerCache = new Map<string, string>();
 /** Block-hash → calculated median fee rate. */
 const blockFeeCache = new Map<string, number>();
 
