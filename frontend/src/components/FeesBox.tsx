@@ -68,7 +68,7 @@ export default function FeesBox({ fees, selectedCurrency, xmrPrice, mempoolBlock
       </div>
       <div className="fees-grid">
         <FeeCard
-          label="No Priority"
+          label="Low Priority"
           sublabel={estimateTime(fees?.slowFee ?? null)}
           fee={fees?.slowFee ?? null}
           color="#3bd16f"
@@ -113,11 +113,6 @@ function FeeCard({
       <div className="fee-sublabel">{sublabel}</div>
       <div className="fee-value" style={{ color }}>
         {fee !== null ? formatFeeRate(fee) : '—'}
-        {fee !== null && (
-          <div className="fee-card-tooltip" style={{ color: 'var(--text-bright)' }}>
-            {(fee / 1e12).toFixed(8)} XMR
-          </div>
-        )}
       </div>
       {fiat && (
         <div className="fee-fiat">

@@ -91,7 +91,7 @@ export default function TxDetail() {
 
       <div className={`tx-status-badge ${tx.inPool ? 'badge-pending' : 'badge-confirmed'}`}>
         {tx.inPool
-          ? '⏳ Unconfirmed (in mempool)'
+          ? '⏳ Unconfirmed (in txpool)'
           : `✓ Confirmed — ${tx.confirmations.toLocaleString()} confirmation${tx.confirmations !== 1 ? 's' : ''}`}
       </div>
       {tx.doubleSpendSeen && (

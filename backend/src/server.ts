@@ -113,7 +113,7 @@ wss.on('connection', (ws: WebSocket) => {
             send(ws, 'stats', { mempoolInfo: s.info, fees: s.fees, networkStats: s.networkStats });
           }
           if (clientState.subscriptions.has('blocks')) {
-            send(ws, 'blocks', s.recentBlocks.slice(0, 8));
+            send(ws, 'blocks', s.recentBlocks.slice(0, 60));
           }
         }
       }

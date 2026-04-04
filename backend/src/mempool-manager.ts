@@ -205,7 +205,7 @@ const minerCache = new Map<string, string>();
 /** Block-hash → calculated median fee rate. */
 const blockFeeCache = new Map<string, number>();
 
-async function calculateBlockMedianFee(hash: string): Promise<number> {
+async function calculateBlockMinFee(hash: string): Promise<number> {
   if (blockFeeCache.has(hash)) return blockFeeCache.get(hash)!;
 
   try {
@@ -233,11 +233,13 @@ async function calculateBlockMedianFee(hash: string): Promise<number> {
     }).filter(r => r > 0).sort((a, b) => a - b);
 
     if (rates.length === 0) return 0;
-    const median = rates[Math.floor(rates.length / 2)];
-    blockFeeCache.set(hash, Math.round(median));
-    return Math.round(median);
+    // Use the minimum (rates is sorted ascending) — this is the cheapest fee
+    // that actually got confirmed, immune to high-fee outliers.
+    const minRate = rates[0];
+    blockFeeCache.set(hash, Math.round(minRate));
+    return Math.round(minRate);
   } catch (err) {
-    console.error(`[mempool] failed to calculate median fee for block ${hash}:`, err);
+    console.error(`[mempool] failed to calculate min fee for block ${hash}:`, err);
     return 0;
   }
 }
@@ -551,7 +553,7 @@ class MempoolManager {
               const chunk = toEnrich.slice(i, i + CHUNK_SIZE);
               await Promise.all(chunk.map(async (block) => {
                 if (!block) return;
-                const med = await calculateBlockMedianFee(block.hash);
+                const med = await calculateBlockMinFee(block.hash);
                 block.medianFee = med;
                 newSnaps.push({
                   ts: block.timestamp * 1000,

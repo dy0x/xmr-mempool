@@ -21,7 +21,7 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
       <div className="loading-screen">
         <div className="loading-spinner" />
         <div className="loading-text">Connecting to Monero node…</div>
-        <div className="loading-sub">Fetching mempool and recent blocks</div>
+        <div className="loading-sub">Fetching txpool and recent blocks</div>
       </div>
     );
   }
@@ -65,7 +65,7 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
 // ── Mempool summary card ──────────────────────────────────────────────────────
 
 import type { MempoolInfo, NetworkStats } from '../types';
-import { formatBytes, piconeroToXMR } from '../types';
+import { formatBytes, piconeroToXMR, formatFeeRate } from '../types';
 
 function MempoolSummary({
   mempoolInfo,
@@ -76,7 +76,7 @@ function MempoolSummary({
 }) {
   return (
     <div className="mempool-summary">
-      <div className="summary-title">Mempool</div>
+      <div className="summary-title">Txpool</div>
       <div className="summary-grid">
         <SummaryItem label="Pending transactions" value={mempoolInfo?.count.toLocaleString() ?? '—'} />
         <SummaryItem
@@ -91,7 +91,7 @@ function MempoolSummary({
           label="Min fee rate"
           value={
             mempoolInfo && mempoolInfo.memPoolMinFee > 0
-              ? `${mempoolInfo.memPoolMinFee.toLocaleString()} ρ/B`
+              ? formatFeeRate(mempoolInfo.memPoolMinFee)
               : '—'
           }
         />

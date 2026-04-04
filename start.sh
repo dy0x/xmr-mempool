@@ -8,6 +8,14 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# ── Parse flags ───────────────────────────────────────────────────────────────
+HOST_FLAG=""
+for arg in "$@"; do
+  case $arg in
+    --host) HOST_FLAG="--host" ;;
+  esac
+done
+
 echo ""
 echo "🔷 XMRLens — Monero Explorer"
 echo "══════════════════════════════════"
@@ -52,16 +60,28 @@ elif [ ! -f node_modules/@rollup/rollup-darwin-arm64/rollup.darwin-arm64.node ] 
   npm install
 fi
 
-npm run dev &
+npm run dev -- $HOST_FLAG &
 FRONTEND_PID=$!
-echo "  Frontend PID: $FRONTEND_PID (http://localhost:4200)"
+if [ -n "$HOST_FLAG" ]; then
+  LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "your-local-ip")
+  echo "  Frontend PID: $FRONTEND_PID"
+  echo "  Local:   http://localhost:4200"
+  echo "  Network: http://${LOCAL_IP}:4200"
+else
+  echo "  Frontend PID: $FRONTEND_PID (http://localhost:4200)"
+fi
 
 # ── Wait ──────────────────────────────────────────────────────────────────────
 
 echo ""
 echo "══════════════════════════════════"
 echo "✅ XMRLens running!"
-echo "   Open: http://localhost:4200"
+if [ -n "$HOST_FLAG" ]; then
+  echo "   Local:   http://localhost:4200"
+  echo "   Network: http://${LOCAL_IP}:4200"
+else
+  echo "   Open: http://localhost:4200"
+fi
 echo "══════════════════════════════════"
 echo ""
 echo "Press Ctrl+C to stop both servers."

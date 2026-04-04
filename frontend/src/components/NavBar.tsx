@@ -93,6 +93,6 @@ export default function NavBar() {
 
 function XmrLogo() {
   return (
-    <div className="navbar-logo-icon"><span>ɱ</span></div>
+    <img src="/xmr-logo.png" alt="Monero" className="navbar-logo-img" />
   );
 }

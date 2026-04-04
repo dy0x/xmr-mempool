@@ -60,7 +60,7 @@ export default function FeeChart({ xmrPrice, selectedCurrency }: FeeChartProps) 
     <div className="fee-chart-card">
       <div className="fee-chart-header">
         <div className="fee-chart-title">
-          Fee Rate History
+          Minimum Fee Rate per Block
         </div>
         <div className="fee-chart-legend">
           <span className="legend-item"><span className="legend-dot" style={{ background: '#3bd16f' }} />Low</span>
@@ -176,10 +176,9 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip, xmrPrice, selectedCurrency
   });
 
   const formatFeeShort = (v: number): string => {
-    if (v < 1_000) return `${Math.round(v)} ρ`;
-    if (v < 1_000_000) return `${Math.round(v / 1000)}K ρ`;
-    if (v < 1_000_000_000) return `${(v / 1_000_000).toFixed(1)}M ρ`;
-    return `${(v / 1_000_000_000).toFixed(1)}G ρ`;
+    if (v <= 0) return '0';
+    const xmrPerKb = (v * 1024) / 1e12;
+    return xmrPerKb.toFixed(6).replace(/\.?0+$/, '');
   };
 
   const formatTime = (ts: number): string => {
@@ -258,6 +257,18 @@ function ChartSVG({ data, svgRef, tooltip, onTooltip, xmrPrice, selectedCurrency
           </text>
         ))}
 
+        {/* Y-axis unit label */}
+        <text
+          x={8}
+          y={PAD.top + cH / 2}
+          textAnchor="middle"
+          fontSize="8"
+          fill="rgba(160,160,160,0.5)"
+          transform={`rotate(-90, 8, ${PAD.top + cH / 2})`}
+        >
+          XMR/kB
+        </text>
+
         {/* Axes */}
         <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + cH}
           stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
@@ -333,8 +344,8 @@ function TooltipPopup({ snap, x, W, xmrPrice, selectedCurrency, formatTime, form
       <div className="chart-tooltip-time">{formatTime(snap.ts)}</div>
       <div className="chart-tooltip-row">
         <span className="chart-tooltip-dot" style={{ background: feeColor(fee) }} />
-        <span className="chart-tooltip-label">Median fee:</span>
-        <span className="chart-tooltip-val">{formatFeeShort(fee)}</span>
+        <span className="chart-tooltip-label">Min fee:</span>
+        <span className="chart-tooltip-val">{((fee * 1024) / 1e12).toFixed(7).replace(/\.?0+$/, '')} XMR/kB</span>
       </div>
       <div className="chart-tooltip-row chart-tooltip-conversion">
         <span className="chart-tooltip-label">Typical tx:</span>

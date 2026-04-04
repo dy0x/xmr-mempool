@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { formatBytes, timeAgo } from '../types';
+import { formatBytes, formatFeeRate, timeAgo } from '../types';
 import XMRAmount from './XMRAmount';
 
 interface MempoolTx {
@@ -36,7 +36,7 @@ export default function MempoolBlockDetail() {
       .catch((e: unknown) => { setError(String(e)); setLoading(false); });
   }, [index]);
 
-  if (loading) return <div className="detail-loading">Loading mempool block…</div>;
+  if (loading) return <div className="detail-loading">Loading txpool block…</div>;
   if (error)   return <div className="detail-error">Error: {error}</div>;
   if (!data)   return null;
 
@@ -45,7 +45,7 @@ export default function MempoolBlockDetail() {
   return (
     <div className="detail-page">
       <div className="detail-breadcrumb">
-        <Link to="/">Dashboard</Link> › Mempool block
+        <Link to="/">Dashboard</Link> › Txpool block
       </div>
 
       <h1 className="detail-title">Pending Block #{data.index + 1}</h1>
@@ -94,7 +94,7 @@ export default function MempoolBlockDetail() {
                     </Link>
                   </td>
                   <td><XMRAmount piconero={tx.fee} decimals={8} /></td>
-                  <td>{tx.feePerByte.toLocaleString()} ρ/B</td>
+                  <td>{formatFeeRate(tx.feePerByte)}</td>
                   <td>{formatBytes(tx.size)}</td>
                   <td>{timeAgo(tx.receivedAt)}</td>
                 </tr>

@@ -14,6 +14,7 @@ import type { MempoolBlock, RecentBlock } from '../types';
 import { feeRateColor, formatBytes, formatFeeRate, piconeroToXMR, timeAgo } from '../types';
 import XMRAmount from './XMRAmount';
 
+
 interface Props {
   mempoolBlocks: MempoolBlock[];
   recentBlocks:  RecentBlock[];
@@ -29,6 +30,20 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
 
   const pending = mempoolBlocks.slice(0, MAX_PENDING);
   const recent  = recentBlocks.slice(0, MAX_RECENT);
+
+  // Track newly confirmed blocks to trigger slide-in animation
+  const [newBlockHeight, setNewBlockHeight] = useState<number | null>(null);
+  const prevHeightRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const h = recent[0]?.height;
+    if (prevHeightRef.current !== undefined && h != null && h !== prevHeightRef.current) {
+      setNewBlockHeight(h);
+      const t = setTimeout(() => setNewBlockHeight(null), 700);
+      return () => clearTimeout(t);
+    }
+    prevHeightRef.current = h;
+  }, [recent[0]?.height]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Drag-to-scroll state
   const [isDragging, setIsDragging] = useState(false);
@@ -68,15 +83,14 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
     }
   };
 
-  // Ensure the chain defaults to being aligned with the content margin (scrollLeft 0)
+  // When a new block arrives, smoothly scroll back to the start so it's visible
   useEffect(() => {
     const scrollEl = scrollRef.current;
     if (!scrollEl) return;
-
     requestAnimationFrame(() => {
-      scrollEl.scrollLeft = 0;
+      scrollEl.scrollTo({ left: 0, behavior: newBlockHeight != null ? 'smooth' : 'instant' });
     });
-  }, [recent[0]?.height]); // Recalculate if the latest block changes, but keep it start-aligned
+  }, [recent[0]?.height]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div 
@@ -92,7 +106,7 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
         {/* Pending blocks — oldest left, newest right (closest to arrow) */}
         <div className="block-row block-row-pending">
           {pending.length === 0 && (
-            <div className="block-empty"><span>Mempool empty</span></div>
+            <div className="block-empty"><span>Txpool empty</span></div>
           )}
           {[...pending].reverse().map((b) => (
             <PendingBlock key={b.index} block={b} onClick={handleBlockClick} />
@@ -114,11 +128,12 @@ export default function MempoolBlocks({ mempoolBlocks, recentBlocks }: Props) {
         {/* Confirmed blocks — newest left, older right */}
         <div className="block-row block-row-confirmed">
           {recent.map((b, i) => (
-            <ConfirmedBlock 
-              key={b.height} 
-              block={b} 
-              isLatest={i === 0} 
-              onClick={handleBlockClick} 
+            <ConfirmedBlock
+              key={b.height}
+              block={b}
+              isLatest={i === 0}
+              isNew={b.height === newBlockHeight}
+              onClick={handleBlockClick}
             />
           ))}
         </div>
@@ -179,13 +194,15 @@ function pendingTip(b: MempoolBlock) {
 
 // ── Confirmed block ───────────────────────────────────────────────────────────
 
-function ConfirmedBlock({ 
-  block, 
-  isLatest, 
-  onClick 
-}: { 
-  block: RecentBlock; 
+function ConfirmedBlock({
+  block,
+  isLatest,
+  isNew,
+  onClick,
+}: {
+  block: RecentBlock;
   isLatest: boolean;
+  isNew: boolean;
   onClick: (e: React.MouseEvent) => void;
 }) {
   const fill = Math.min(100, (block.size / BLOCK_CAP) * 100);
@@ -197,7 +214,7 @@ function ConfirmedBlock({
   return (
     <Link
       to={`/block/${block.height}`}
-      className={`xblock xblock-confirmed${isLatest ? ' xblock-latest' : ''}`}
+      className={`xblock xblock-confirmed${isLatest ? ' xblock-latest' : ''}${isNew ? ' xblock-slide-in' : ''}`}
       title={confirmedTip(block)}
       onClick={onClick}
       draggable="false"
