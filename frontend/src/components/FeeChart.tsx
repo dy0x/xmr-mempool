@@ -322,20 +322,18 @@ function ChartSVG({ data, width, height, tooltip, onTooltip, xmrPrice, selectedC
         xmrPrice={xmrPrice}
         selectedCurrency={selectedCurrency}
         formatTime={formatTime}
-        formatFeeShort={formatFeeShort}
       />}
     </div>
   );
 }
 
-function TooltipPopup({ snap, x, W, xmrPrice, selectedCurrency, formatTime, formatFeeShort }: {
+function TooltipPopup({ snap, x, W, xmrPrice, selectedCurrency, formatTime }: {
   snap: FeeSnapshot;
   x: number;
   W: number;
   xmrPrice?: number;
   selectedCurrency?: string;
   formatTime: (ts: number) => string;
-  formatFeeShort: (v: number) => string;
 }) {
   const fee = medianFee(snap);
   const typicalXMR = fee * TYPICAL_TX_BYTES / 1e12;

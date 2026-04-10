@@ -44,7 +44,7 @@ const RCT_TYPE: Record<number, string> = {
   6: 'Bulletproof+',
 };
 
-function outputKey(out: TxData['vout'][number]): string {
+function outputKey(out: NonNullable<TxData['vout']>[number]): string {
   return out.target?.tagged_key?.key ?? out.target?.key ?? '—';
 }
 
