@@ -2,3 +2,4 @@
 .vscode/
 .idea/
 Thumbs.db
+.env

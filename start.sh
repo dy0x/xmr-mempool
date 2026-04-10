@@ -20,6 +20,18 @@ echo ""
 echo "🔷 XMRLens — Monero Explorer"
 echo "══════════════════════════════════"
 
+# ── Load .env ─────────────────────────────────────────────────────────────────
+
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  set -a
+  # shellcheck source=.env
+  source "$SCRIPT_DIR/.env"
+  set +a
+else
+  echo "⚠  No .env file found — copy .env.example to .env and fill in your credentials."
+  exit 1
+fi
+
 # ── Backend ──────────────────────────────────────────────────────────────────
 
 echo ""
@@ -32,11 +44,7 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
-# Full-access RPC (port 18081 with credentials)
-export MONERO_HOST="${MONERO_HOST:-192.168.0.12}"
-export MONERO_RPC_PORT="${MONERO_RPC_PORT:-18081}"
-export MONERO_RPC_USER="${MONERO_RPC_USER:-monero}"
-export MONERO_RPC_PASS="${MONERO_RPC_PASS:-WsPs_7onqOlvSNlaHltNn7MkCNpVs7XIZKD8WKEgVp0=}"
+export MONERO_HOST MONERO_RPC_PORT MONERO_RPC_USER MONERO_RPC_PASS
 export PORT="${PORT:-3001}"
 
 npm run dev &

@@ -33,9 +33,9 @@ export default function Dashboard({ state, selectedCurrency, xmrPrice, priceChan
   return (
     <div className="dashboard">
       {/* Stats bar */}
-      <StatsBar 
-        mempoolInfo={mempoolInfo} 
-        networkStats={networkStats} 
+      <StatsBar
+        mempoolInfo={mempoolInfo}
+        networkStats={networkStats}
         xmrPrice={xmrPrice}
         selectedCurrency={selectedCurrency}
         priceChange24h={priceChange24h}
