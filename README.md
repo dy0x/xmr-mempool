@@ -68,6 +68,15 @@ The app will be available at `http://your-server-ip`. Add `--build` if you've ma
 
 ---
 
+## 🏠 Umbrel
+
+XMRLens is available as a one-click install on [Umbrel](https://umbrel.com) via the community app store.
+
+**Install via Umbrel community app store:**
+[https://github.com/dy0x/umbrel-apps](https://github.com/dy0x/umbrel-apps)
+
+---
+
 ## 🛠️ Development
 
 ### Prerequisites
