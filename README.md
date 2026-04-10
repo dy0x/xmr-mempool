@@ -17,66 +17,109 @@ XMRLens is a real-time Monero (XMR) txpool and blockchain explorer, heavily insp
 - **Multi-Currency Support**: View XMR prices and values in USD, EUR, BTC, and more.
 - **Custom Themes**: Choose between Monero (Dark), Dusk, and Light modes.
 
-## 🚀 Getting Started
+---
+
+## 🚀 Deployment (Docker)
+
+The recommended way to run XMRLens. Requires [Docker](https://docs.docker.com/get-docker/) and a running Monero full node.
+
+> **Note:** A full (non-pruned) Monero node is required. Pruned nodes do not serve the full transaction history needed for the block and transaction explorer pages.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/dy0x/xmr-mempool.git
+cd xmr-mempool
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your Monero node details:
+
+```env
+# Primary node
+MONERO_NODE_1_HOST=127.0.0.1
+MONERO_NODE_1_PORT=18081
+MONERO_NODE_1_USER=monero
+MONERO_NODE_1_PASS=your-rpc-password
+
+# Optional fallback node (uncomment to enable)
+# MONERO_NODE_2_HOST=your-backup-node
+# MONERO_NODE_2_PORT=18081
+# MONERO_NODE_2_TLS=true
+
+# Port to expose the app on
+APP_PORT=80
+```
+
+You can define as many fallback nodes as needed (`MONERO_NODE_3_*`, `MONERO_NODE_4_*`, …). The backend tries them in order and automatically switches back to a higher-priority node when it recovers.
+
+### 3. Start
+
+```bash
+docker-compose up -d
+```
+
+The app will be available at `http://your-server-ip`. Add `--build` if you've made code changes.
+
+---
+
+## 🛠️ Development
 
 ### Prerequisites
 
 - **Node.js**: v18 or later
-- **Monero Daemon (`monerod`)**: Access to a Monero node with RPC enabled. Restricted RPC is supported, but some administrative stats may require full access.
+- Access to a Monero node with RPC enabled
 
-### Installation
+### Setup
 
-1. **Clone the repository**:
+1. **Clone and configure**:
    ```bash
    git clone https://github.com/dy0x/xmr-mempool.git
    cd xmr-mempool
+   cp .env.example .env
+   # Edit .env with your Monero node credentials
    ```
 
-2. **Configure Environment**:
-   The backend expects certain environment variables to connect to your Monero node. You can set these in your shell or modify the `start.sh` script.
+2. **Start both servers** (installs dependencies automatically):
+   ```bash
+   chmod +x start.sh
+   ./start.sh
+   ```
 
-   - `MONERO_HOST`: Hostname of your monerod (default: `localhost`)
-   - `MONERO_RPC_PORT`: RPC port (default: `18081`)
-   - `MONERO_RPC_USER`: RPC username (if enabled)
-   - `MONERO_RPC_PASS`: RPC password (if enabled)
-   - `PORT`: Backend server port (default: `3001`)
+   Or run each manually:
 
-### Running with the Start Script
+   **Backend** (port 3001):
+   ```bash
+   cd backend
+   npm install
+   npm run dev
+   ```
 
-The easiest way to run XMRLens locally is using the provided `start.sh` script, which handles dependency installation and starts both the backend and frontend.
+   **Frontend** (port 4200):
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
-```bash
-chmod +x start.sh
-./start.sh
-```
+3. Open `http://localhost:4200`.
 
-Alternatively, you can run the components manually:
+---
 
-#### Backend
-```bash
-cd backend
-npm install
-npm run dev
-```
+## 🏗️ Architecture
 
-#### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The application will be available at `http://localhost:4200`.
-
-## 🛠️ Architecture
-
-- **Frontend**: Built with **React**, **TypeScript**, and **Vite**. Uses **React Router** for navigation and **WebSockets** for live data.
-- **Backend**: **Node.js** with **Express** and **ws**. Acts as a proxy/aggregator for the Monero RPC, polling the daemon and broadcasting updates to clients.
-- **Monero RPC**: Communicates with `monerod` via JSON-RPC to fetch pool transactions, block headers, and network info.
+- **Frontend**: React + TypeScript + Vite. WebSockets for live data, React Router for navigation.
+- **Backend**: Node.js + Express + ws. Polls monerod and broadcasts updates to connected clients.
+- **Monero RPC**: JSON-RPC + REST over HTTP/HTTPS with Digest auth. Supports multiple nodes with automatic failover.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Whether it's fixing bugs, adding new features (like more miner pool detection), or improving UI/UX:
+Contributions are welcome! Whether it's fixing bugs, adding new features, or improving UI/UX:
 
 1. Fork the project.
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
