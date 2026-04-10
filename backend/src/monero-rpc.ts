@@ -188,10 +188,21 @@ export interface MoneroNodeConfig {
   port: number;
   user?: string;
   pass?: string;
+  tls?: boolean;   // true for https (default: false)
+}
+
+const HEALTH_CHECK_INTERVAL_MS = 5 * 60_000; // 5 minutes
+const HEALTH_CHECK_TIMEOUT_MS  = 4_000;
+
+interface NodeHealth {
+  healthy: boolean;
+  lastFailure: number;
 }
 
 class MoneroRPC {
   private clients: { client: AxiosInstance; baseUrl: string; config: MoneroNodeConfig }[] = [];
+  private health: NodeHealth[] = [];
+  private healthTimer: NodeJS.Timeout | null = null;
 
   constructor(configs: MoneroNodeConfig[]) {
     if (configs.length === 0) {
@@ -199,7 +210,7 @@ class MoneroRPC {
     }
 
     for (const conf of configs) {
-      const baseUrl = `http://${conf.host}:${conf.port}`;
+      const baseUrl = `${conf.tls ? 'https' : 'http'}://${conf.host}:${conf.port}`;
       const client = axios.create({
         baseURL: baseUrl,
         timeout: 5000,
@@ -211,6 +222,49 @@ class MoneroRPC {
       }
 
       this.clients.push({ client, baseUrl, config: conf });
+      this.health.push({ healthy: true, lastFailure: 0 });
+    }
+
+    if (this.clients.length > 1) {
+      this.startHealthChecks();
+    }
+  }
+
+  destroy() {
+    if (this.healthTimer) clearInterval(this.healthTimer);
+  }
+
+  getActiveNode(): MoneroNodeConfig | null {
+    const i = this.health.findIndex(h => h.healthy);
+    return i >= 0 ? this.clients[i].config : (this.clients[0]?.config ?? null);
+  }
+
+  private startHealthChecks() {
+    this.healthTimer = setInterval(() => {
+      void this.runHealthChecks();
+    }, HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  private async runHealthChecks() {
+    for (let i = 0; i < this.clients.length; i++) {
+      if (!this.health[i].healthy) {
+        const ok = await this.pingNode(i);
+        if (ok) {
+          this.health[i].healthy = true;
+          console.log(`[monero-rpc] Node ${i} (${this.clients[i].baseUrl}) is back online`);
+        }
+      }
+    }
+  }
+
+  private async pingNode(index: number): Promise<boolean> {
+    try {
+      await this.clients[index].client.get('/get_height', {
+        timeout: HEALTH_CHECK_TIMEOUT_MS,
+      });
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -264,17 +318,29 @@ class MoneroRPC {
   }
 
   private async executeWithFailover<T>(operation: (client: AxiosInstance) => Promise<T>): Promise<T> {
-    let lastError: unknown;
+    const indices = Array.from({ length: this.clients.length }, (_, i) => i);
+    // Try healthy nodes first (preserving priority order), then unhealthy as last resort
+    const ordered = [
+      ...indices.filter(i => this.health[i].healthy),
+      ...indices.filter(i => !this.health[i].healthy),
+    ];
 
-    for (let i = 0; i < this.clients.length; i++) {
+    let lastError: unknown;
+    for (const i of ordered) {
       const { client, baseUrl } = this.clients[i];
       try {
         const result = await operation(client);
+        if (!this.health[i].healthy) {
+          this.health[i].healthy = true;
+          console.log(`[monero-rpc] Node ${i} (${baseUrl}) recovered`);
+        }
         return result;
-      } catch (err: any) {
+      } catch (err) {
         lastError = err;
-        if (i < this.clients.length - 1) {
-          console.warn(`[monero-rpc] Request failed on ${baseUrl}, trying next node...`);
+        if (this.health[i].healthy) {
+          this.health[i].healthy = false;
+          this.health[i].lastFailure = Date.now();
+          console.warn(`[monero-rpc] Node ${i} (${baseUrl}) marked unhealthy, trying next...`);
         }
       }
     }
@@ -394,12 +460,14 @@ class MoneroRPC {
 // ── Singleton ─────────────────────────────────────────────────────────────────
 
 function loadConfigNodes(): MoneroNodeConfig[] {
+  // 1. config.json (optional local override)
   try {
     const configPath = path.join(__dirname, '..', 'config.json');
     if (fs.existsSync(configPath)) {
       const raw = fs.readFileSync(configPath, 'utf8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+        console.log(`[monero-rpc] Loaded ${parsed.nodes.length} node(s) from config.json`);
         return parsed.nodes;
       }
     }
@@ -407,12 +475,28 @@ function loadConfigNodes(): MoneroNodeConfig[] {
     console.error('[monero-rpc] Error reading config.json:', err);
   }
 
-  // Fallback to env vars
+  // 2. Numbered node vars: MONERO_NODE_1_HOST, MONERO_NODE_2_HOST, …
+  const numberedNodes: MoneroNodeConfig[] = [];
+  for (let i = 1; process.env[`MONERO_NODE_${i}_HOST`]?.trim(); i++) {
+    numberedNodes.push({
+      host: process.env[`MONERO_NODE_${i}_HOST`]!,
+      port: parseInt(process.env[`MONERO_NODE_${i}_PORT`] ?? '18081', 10),
+      user: process.env[`MONERO_NODE_${i}_USER`],
+      pass: process.env[`MONERO_NODE_${i}_PASS`],
+      tls:  process.env[`MONERO_NODE_${i}_TLS`] === 'true',
+    });
+  }
+  if (numberedNodes.length > 0) {
+    console.log(`[monero-rpc] Loaded ${numberedNodes.length} node(s) from MONERO_NODE_* vars`);
+    return numberedNodes;
+  }
+
+  // 3. Legacy single-node env vars
   return [{
-    host: process.env.MONERO_HOST     || '192.168.0.12',
-    port: parseInt(process.env.MONERO_RPC_PORT || '18081', 10),
-    user: process.env.MONERO_RPC_USER || 'monero',
-    pass: process.env.MONERO_RPC_PASS || 'WsPs_7onqOlvSNlaHltNn7MkCNpVs7XIZKD8WKEgVp0=',
+    host: process.env.MONERO_HOST || '127.0.0.1',
+    port: parseInt(process.env.MONERO_RPC_PORT ?? '18081', 10),
+    user: process.env.MONERO_RPC_USER,
+    pass: process.env.MONERO_RPC_PASS,
   }];
 }
 

@@ -94,6 +94,7 @@ export interface NetworkStats {
   topBlockHash: string;
   blockTarget: number;   // seconds
   totalEmission?: number; // atomic units (piconero)
+  activeNodeHost?: string;
 }
 
 export interface MempoolState {
@@ -587,6 +588,7 @@ class MempoolManager {
 
       // ── Assemble state ───────────────────────────────────────────────────
       const networkStats = infoToNetworkStats(info, newTip ?? undefined);
+      networkStats.activeNodeHost = moneroRPC.getActiveNode()?.host;
 
       this.state = {
         info: mempoolInfo,

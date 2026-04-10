@@ -52,6 +52,7 @@ export interface NetworkStats {
   topBlockHash: string;
   blockTarget: number;
   totalEmission?: number;
+  activeNodeHost?: string;
 }
 
 export interface AppState {
@@ -108,7 +109,9 @@ export function formatDifficulty(diff: number): string {
 
 /** Format a unix timestamp as time-ago */
 export function timeAgo(timestamp: number): string {
+  if (!timestamp || timestamp <= 0) return 'unknown';
   const diffSec = Math.floor((Date.now() / 1000) - timestamp);
+  if (diffSec < 0 || diffSec > 30 * 86400) return 'unknown';
   if (diffSec < 60) return `${diffSec}s ago`;
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
   if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;

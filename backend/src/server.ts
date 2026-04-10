@@ -15,6 +15,7 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import apiRouter from './routes';
 import { mempoolManager, MempoolState } from './mempool-manager';
+import { moneroRPC } from './monero-rpc';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const app = express();
@@ -162,14 +163,17 @@ httpServer.listen(PORT, async () => {
 
   try {
     await mempoolManager.start();
-    console.log('   ✅ Monero node connected & polling started\n');
+    const active = moneroRPC.getActiveNode();
+    console.log(`   ✅ Monero node connected & polling started`);
+    console.log(`   Active node: ${active?.host ?? 'unknown'}\n`);
   } catch (err) {
     console.error('   ❌ Failed to connect to Monero node:', err);
-    console.error('   Check MONERO_HOST / MONERO_RPC_PORT env vars\n');
+    console.error('   Check MONERO_NODE_* env vars\n');
   }
 });
 
 process.on('SIGTERM', () => {
   mempoolManager.stop();
+  moneroRPC.destroy();
   httpServer.close();
 });

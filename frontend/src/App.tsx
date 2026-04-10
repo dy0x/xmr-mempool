@@ -179,7 +179,8 @@ export default function App() {
                 <span className="ws-label">Mainnet</span>
               </div>
               <span className="footer-node-version">
-                Node: <span className="mono">{state.networkStats?.version ?? 'Unknown'}</span>
+                Node: <span className="mono">{state.networkStats?.activeNodeHost || '…'}</span>
+                {state.networkStats?.version ? <>{' '}(<span className="mono">{state.networkStats.version}</span>)</> : null}
               </span>
             </div>
             <a href="https://github.com/dy0x/xmr-mempool" target="_blank" rel="noopener noreferrer" className="footer-github" title="View on GitHub">
