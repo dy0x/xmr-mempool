@@ -3,7 +3,7 @@ services:
     build: ./backend
     environment:
       PORT: 3001
-      MONERO_NODE_1_HOST: ${MONERO_NODE_1_HOST:-}
+      MONERO_NODE_1_HOST: ${MONERO_NODE_1_HOST:-monero_node_1}
       MONERO_NODE_1_PORT: ${MONERO_NODE_1_PORT:-18081}
       MONERO_NODE_1_USER: ${MONERO_NODE_1_USER:-}
       MONERO_NODE_1_PASS: ${MONERO_NODE_1_PASS:-}
@@ -18,6 +18,9 @@ services:
       MONERO_NODE_3_USER: ${MONERO_NODE_3_USER:-}
       MONERO_NODE_3_PASS: ${MONERO_NODE_3_PASS:-}
       MONERO_NODE_3_TLS:  ${MONERO_NODE_3_TLS:-false}
+    networks:
+      - default
+      - monero_1_default
     restart: unless-stopped
 
   frontend:
@@ -27,3 +30,8 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+networks:
+  default:
+  monero_1_default:
+    external: true
